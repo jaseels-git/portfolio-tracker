@@ -217,11 +217,11 @@ input:focus{border-color:rgba(201,168,76,.5)}
 </nav>
 
 <main id="main"></main>
-<button id="fab" onclick="openModal()">+</button>
+<button id="fab">+</button>
 
 <!-- ADD/EDIT MODAL -->
 
-<div id="overlay" onclick="bgClose(event)">
+<div id="overlay">
   <div id="modal">
     <div class="modal-title" id="mTitle">Add Holding</div>
 
@@ -729,6 +729,15 @@ if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone&&!localS
 load();render();
 refreshPrices();
 startAutoRefresh();
+
+// iOS Safari - bind touch events directly
+var fab = document.getElementById('fab');
+fab.addEventListener('touchend', function(e){ e.preventDefault(); openModal(); }, {passive:false});
+fab.addEventListener('click', function(e){ e.preventDefault(); openModal(); });
+
+var ov = document.getElementById('overlay');
+ov.addEventListener('touchend', function(e){ if(e.target===ov){ e.preventDefault(); closeModal(); } }, {passive:false});
+ov.addEventListener('click', function(e){ if(e.target===ov) closeModal(); });
 </script>
 
 </body>

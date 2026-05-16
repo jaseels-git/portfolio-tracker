@@ -126,8 +126,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #fab:active{transform:scale(.92)}
 
 /* MODAL */
-#overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:none;align-items:flex-end;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#overlay.open{display:flex}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:flex-end;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);visibility:hidden;opacity:0;transition:opacity .2s,visibility .2s}
+#overlay.open{visibility:visible;opacity:1}
 #modal{background:#12122A;border-radius:22px 22px 0 0;padding:22px 18px calc(var(–safe-bottom) + 30px);width:100%;border-top:1px solid rgba(201,168,76,.25);max-height:93dvh;overflow-y:auto;animation:slideUp .28s cubic-bezier(.32,.72,0,1)}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
 .modal-title{color:var(–gold);font-family:‘Playfair Display’,serif;font-size:19px;margin-bottom:18px}
@@ -217,7 +217,7 @@ input:focus{border-color:rgba(201,168,76,.5)}
 </nav>
 
 <main id="main"></main>
-<button id="fab">+</button>
+<div id="fab" role="button" aria-label="Add holding" style="cursor:pointer;user-select:none">+</div>
 
 <!-- ADD/EDIT MODAL -->
 
@@ -655,9 +655,9 @@ function openModal(id=null){
     selMkt('DFM');selCur('AED');
   }
   upHint();
-  document.getElementById('overlay').classList.add('open');
+  var ol=document.getElementById('overlay');ol.classList.add('open');ol.style.visibility='visible';ol.style.opacity='1';
 }
-function closeModal(){document.getElementById('overlay').classList.remove('open');}
+function closeModal(){var ol=document.getElementById('overlay');ol.classList.remove('open');ol.style.visibility='hidden';ol.style.opacity='0';}
 function bgClose(e){if(e.target===document.getElementById('overlay'))closeModal();}
 
 function selMkt(m){

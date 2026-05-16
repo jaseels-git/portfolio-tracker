@@ -223,7 +223,7 @@ input:focus{border-color:rgba(201,168,76,.5)}
 
 <!-- FAB -->
 
-<button id="fab">+</button>
+<button id="fab" onclick="openModal()">+</button>
 
 <!-- MODAL OVERLAY -->
 
@@ -486,16 +486,28 @@ function upHint(){
 function doSearch(q){
   if(q.length<2){document.getElementById('sr').innerHTML='';return;}
   clearTimeout(sTimer);
-  sTimer=setTimeout(async()=>{
+  sTimer=setTimeout(async function(){
     try{
-      const r=await fetch(API+'?action=search&query='+encodeURIComponent(q)+'&market='+encodeURIComponent(fMkt));
-      const d=await r.json();
+      const resp=await fetch(API+'?action=search&query='+encodeURIComponent(q)+'&market='+encodeURIComponent(fMkt));
+      const d=await resp.json();
       const res=d.results||[];
-      if(!res.length){document.getElementById('sr').innerHTML='<div style="color:var(--dim);font-size:12px;padding:10px">No results found</div>';return;}
-      document.getElementById('sr').innerHTML='<div class="sres">'+res.map(r=>'<div class="sri" data-sym="'+r.symbol+'" data-name="'+r.name.replace(/"/g,\'&quot;\')+'" data-exch="'+(r.exchange||fMkt)+'">'+(r.thumb?'<img src="'+r.thumb+'" style="width:22px;height:22px;border-radius:50%">':'<div style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px">'+(r.type==='crypto'?'₿':'📈')+'</div>')+'<div style="flex:1;min-width:0"><div style="color:#fff;font-size:13px;font-weight:500">'+r.name+'</div><div style="color:var(--dim);font-size:11px">'+r.symbol+'</div></div><div style="color:var(--gold);font-size:10px;background:rgba(201,168,76,.1);border-radius:5px;padding:1px 6px">'+(r.exchange||fMkt)+'</div></div>').join('')+'</div>';
-    }catch(e){document.getElementById('sr').innerHTML='<div style="color:var(--dim);font-size:12px;padding:10px">Search unavailable</div>';}
+      if(!res.length){document.getElementById('sr').innerHTML='<div style="color:#555;font-size:12px;padding:10px">No results found</div>';return;}
+      let html='<div class="sres">';
+      res.forEach(function(item){
+        const safeName=item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        const icon=item.thumb?('<img src="'+item.thumb+'" style="width:22px;height:22px;border-radius:50%">'):'<div style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px">'+(item.type==='crypto'?'&#x20BF;':'&#x1F4C8;')+'</div>';
+        html+='<div class="sri" data-sym="'+item.symbol+'" data-name="'+safeName+'" data-exch="'+(item.exchange||fMkt)+'">';
+        html+=icon;
+        html+='<div style="flex:1;min-width:0"><div style="color:#fff;font-size:13px;font-weight:500">'+item.name+'</div><div style="color:#555;font-size:11px">'+item.symbol+'</div></div>';
+        html+='<div style="color:#C9A84C;font-size:10px;background:rgba(201,168,76,.1);border-radius:5px;padding:1px 6px">'+(item.exchange||fMkt)+'</div>';
+        html+='</div>';
+      });
+      html+='</div>';
+      document.getElementById('sr').innerHTML=html;
+    }catch(e){document.getElementById('sr').innerHTML='<div style="color:#555;font-size:12px;padding:10px">Search unavailable</div>';}
   },400);
 }
+
 function selStk(sym,name){
   fStk={symbol:sym,name:name};
   document.getElementById('sr').innerHTML='';
@@ -557,40 +569,17 @@ function upRlbl(){const el=document.getElementById('rl');if(!el||!lastRfr)return
 function toast(msg,type='success'){const e=document.getElementById('toast');e.textContent=msg;e.style.background=type==='error'?'#E05555':'#4CAF7D';e.classList.add('on');setTimeout(()=>e.classList.remove('on'),2500);}
 
 // ── Wire up events ──
-window.addEventListener('DOMContentLoaded',function(){
-  // FAB
-  document.getElementById('fab').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();openModal();});
-
-  // Overlay close
-  document.getElementById('overlay').addEventListener('click',function(){closeModal();});
-
-  // Cancel btn
-  document.getElementById('bcan').addEventListener('click',function(){closeModal();});
-
-  // Save btn
-  document.getElementById('bsave').addEventListener('click',function(){saveH();});
-
-  // Search input
-  document.getElementById('si').addEventListener('input',function(){doSearch(this.value);});
-
-  // Search results (event delegation)
-  document.getElementById('sr').addEventListener('click',function(e){
-    const row=e.target.closest('.sri');if(!row)return;
-    selStk(row.dataset.sym,row.dataset.name);
-  });
-
-  // Form hints
-  document.getElementById('fsh').addEventListener('input',upHint);
-  document.getElementById('fbp').addEventListener('input',upHint);
-
-  // Nav buttons
-  document.getElementById('bd').addEventListener('click',function(){go('d');});
-  document.getElementById('bh').addEventListener('click',function(){go('h');});
-  document.getElementById('bm').addEventListener('click',function(){go('m');});
-
-  // Refresh btn
-  document.getElementById('rb').addEventListener('click',function(){rfr(true);});
-});
+// Direct bindings - no DOMContentLoaded needed
+function bindUI(){
+  document.getElementById('overlay').onclick=function(){closeModal();};
+  document.getElementById('bcan').onclick=function(){closeModal();};
+  document.getElementById('bsave').onclick=function(){saveH();};
+  document.getElementById('si').oninput=function(){doSearch(this.value);};
+  document.getElementById('sr').onclick=function(e){const r=e.target.closest('.sri');if(r)selStk(r.dataset.sym,r.dataset.name);};
+  document.getElementById('fsh').oninput=upHint;
+  document.getElementById('fbp').oninput=upHint;
+}
+bindUI();
 
 // ── Init ──
 ld();render();

@@ -478,21 +478,49 @@ function doSearch(q){
       const resp=await fetch(API+'?action=search&query='+encodeURIComponent(q)+'&market='+encodeURIComponent(fMkt));
       const d=await resp.json();
       const res=d.results||[];
-      if(!res.length){document.getElementById('sr').innerHTML='<div style="color:#555;font-size:12px;padding:10px">No results found</div>';return;}
-      let html='<div class="sres">';
-      res.forEach(function(item){
-        const safeName=item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-        const icon=item.thumb?('<img src="'+item.thumb+'" style="width:22px;height:22px;border-radius:50%">'):'<div style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px">'+(item.type==='crypto'?'&#x20BF;':'&#x1F4C8;')+'</div>';
-        html+='<div class="sri" data-sym="'+item.symbol+'" data-name="'+safeName+'" data-exch="'+(item.exchange||fMkt)+'">';
-        html+=icon;
-        html+='<div style="flex:1;min-width:0"><div style="color:#fff;font-size:13px;font-weight:500">'+item.name+'</div><div style="color:#555;font-size:11px">'+item.symbol+'</div></div>';
-        html+='<div style="color:#C9A84C;font-size:10px;background:rgba(201,168,76,.1);border-radius:5px;padding:1px 6px">'+(item.exchange||fMkt)+'</div>';
+      let html='';
+      if(res.length){
+        html+='<div class="sres">';
+        res.forEach(function(item){
+          const safeName=item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+          const icon=item.thumb?('<img src="'+item.thumb+'" style="width:22px;height:22px;border-radius:50%">'):'<div style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px">'+(item.type==='crypto'?'&#x20BF;':'&#x1F4C8;')+'</div>';
+          html+='<div class="sri" data-sym="'+item.symbol+'" data-name="'+safeName+'" data-exch="'+(item.exchange||fMkt)+'">';
+          html+=icon;
+          html+='<div style="flex:1;min-width:0"><div style="color:#fff;font-size:13px;font-weight:500">'+item.name+'</div><div style="color:#555;font-size:11px">'+item.symbol+'</div></div>';
+          html+='<div style="color:#C9A84C;font-size:10px;background:rgba(201,168,76,.1);border-radius:5px;padding:1px 6px">'+(item.exchange||fMkt)+'</div>';
+          html+='</div>';
+        });
         html+='</div>';
-      });
-      html+='</div>';
+      }
+      // Always show manual entry option at bottom
+      const suffixes={DFM:'.DU',ADX:'.AD',NSE:'.NS',BSE:'.BO',International:'',Crypto:''};
+      const sfx=suffixes[fMkt]||'';      const suggestedTicker=q.toUpperCase().replace(/\s+/g,'')+sfx;
+      html+='<div onclick="addManually(\''+suggestedTicker+'\',\''+q+'\')"'+
+        ' style="padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(201,168,76,.06);border:1px dashed rgba(201,168,76,.3);border-radius:10px;margin-top:6px">'+
+        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(201,168,76,.15);display:flex;align-items:center;justify-content:center;font-size:14px">✏️</div>'+
+        '<div><div style="color:#C9A84C;font-size:13px;font-weight:600">Add "'+q+'" manually</div>'+
+        '<div style="color:#555;font-size:11px;margin-top:2px">Ticker: '+suggestedTicker+' · tap to customise</div></div></div>';
       document.getElementById('sr').innerHTML=html;
-    }catch(e){document.getElementById('sr').innerHTML='<div style="color:#555;font-size:12px;padding:10px">Search unavailable</div>';}
+    }catch(e){
+      const suffixes={DFM:'.DU',ADX:'.AD',NSE:'.NS',BSE:'.BO',International:'',Crypto:''};
+      const sfx=suffixes[fMkt]||'';
+      const suggestedTicker=q.toUpperCase().replace(/\s+/g,'')+sfx;
+      document.getElementById('sr').innerHTML='<div onclick="addManually(\''+suggestedTicker+'\',\''+q+'\')"'+
+        ' style="padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(201,168,76,.06);border:1px dashed rgba(201,168,76,.3);border-radius:10px">'+
+        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(201,168,76,.15);display:flex;align-items:center;justify-content:center;font-size:14px">✏️</div>'+
+        '<div><div style="color:#C9A84C;font-size:13px;font-weight:600">Add "'+q+'" manually</div>'+
+        '<div style="color:#555;font-size:11px;margin-top:2px">Ticker: '+suggestedTicker+' · tap to customise</div></div></div>';
+    }
   },400);
+}
+
+// Manual entry dialog
+function addManually(suggestedTicker, name){
+  const ticker=prompt('Enter ticker symbol:', suggestedTicker);
+  if(!ticker) return;
+  const displayName=prompt('Enter stock name:', name);
+  if(!displayName) return;
+  selStk(ticker.toUpperCase().trim(), displayName.trim());
 }
 
 function selStk(sym,name){
@@ -576,4 +604,3 @@ setInterval(upRlbl,30000);
 </script>
 </body>
 </html>
-

@@ -114,29 +114,53 @@ async function fetchPrice(symbol) {
   // For UAE stocks: use Yahoo Finance with .AE suffix
   if (isUAE) {
     const yahooSym = UAE_YAHOO_MAP[symbol] || symbol.replace('.DU', '.AE').replace('.AD', '.AE');
-    for (const base of ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com']) {
-      try {
-        const url = `${base}/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=1d&range=1d`;
-        const r = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json',
-            'Referer': 'https://finance.yahoo.com',
+    // Try multiple Yahoo endpoints and regional domains
+    const endpoints = [
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=1d&range=1d`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=1d&range=1d`,
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(yahooSym)}`,
+    ];
+    const uaHeaders = [
+      { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json', 'Referer': 'https://finance.yahoo.com' },
+      { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', 'Accept': '*/*' },
+      { 'User-Agent': 'python-requests/2.28.0', 'Accept': 'application/json' },
+    ];
+    for (const url of endpoints) {
+      for (const headers of uaHeaders) {
+        try {
+          const r = await fetch(url, { headers });
+          if (!r.ok) continue;
+          const data = await r.json();
+          // v8 chart response
+          const meta = data?.chart?.result?.[0]?.meta;
+          if (meta?.regularMarketPrice) {
+            console.log('Yahoo UAE success:', symbol, yahooSym, meta.regularMarketPrice);
+            return { price: meta.regularMarketPrice, change24h: meta.regularMarketChangePercent || 0, currency: 'AED' };
           }
-        });
-        const data = await r.json();
-        const meta = data?.chart?.result?.[0]?.meta;
-        if (meta?.regularMarketPrice) {
-          console.log('Yahoo UAE success:', symbol, yahooSym, meta.regularMarketPrice);
-          return {
-            price: meta.regularMarketPrice,
-            change24h: meta.regularMarketChangePercent || 0,
-            currency: 'AED',
-          };
-        }
-      } catch(e) {}
+          // v7 quote response
+          const q = data?.quoteResponse?.result?.[0];
+          if (q?.regularMarketPrice) {
+            console.log('Yahoo UAE v7 success:', symbol, yahooSym, q.regularMarketPrice);
+            return { price: q.regularMarketPrice, change24h: q.regularMarketChangePercent || 0, currency: 'AED' };
+          }
+        } catch(e) {}
+      }
     }
-    console.log('Yahoo UAE failed for:', symbol, yahooSym);
+    // Last resort: Alpha Vantage for UAE
+    try {
+      const avSym = symbol.replace('.DU','').replace('.AD','');
+      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSym)}&apikey=${AV_KEY}`;
+      const r = await fetch(url);
+      const data = await r.json();
+      const q = data['Global Quote'];
+      if (q?.['05. price'] && parseFloat(q['05. price']) > 0) {
+        const price = parseFloat(q['05. price']);
+        const prev = parseFloat(q['08. previous close'] || q['05. price']);
+        console.log('AV UAE success:', symbol, price);
+        return { price, change24h: prev > 0 ? ((price-prev)/prev)*100 : 0, currency: 'AED' };
+      }
+    } catch(e) {}
+    console.log('All UAE methods failed for:', symbol);
     return null;
   }
 

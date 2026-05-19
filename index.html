@@ -748,7 +748,7 @@ async function rfr(manual=false){
         const k=(h.market==='Crypto'?'crypto:':'')+h.symbol;
         if(d.prices[k]){
           const p=d.prices[k];let price=p.price;
-          if(p.currency&&p.currency!==h.currency){const pU=toU(price,p.currency==='AED'?'AED':p.currency==='INR'?'INR':'USD');price=frU(pU,h.currency);}
+          const apiCur=p.currency||'USD';if(apiCur!==h.currency){const pUSD=apiCur==='USD'?price:apiCur==='AED'?price/AR:apiCur==='INR'?price/IR:price;price=h.currency==='USD'?pUSD:h.currency==='AED'?pUSD*AR:h.currency==='INR'?pUSD*IR:pUSD;}
           return{...h,currentPrice:Math.round(price*1000)/1000,change24h:p.change24h||0,livePrice:true};
         }return h;
       });
@@ -783,4 +783,3 @@ setInterval(upRlbl,30000);
 </script>
 </body>
 </html>
-

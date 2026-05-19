@@ -1,11 +1,13 @@
-// api/prices.js — Multi-source price fetcher
+// api/prices.js — Alpha Vantage + CoinGecko
+
+const AV_KEY = 'ZMF8T0GYQONK8CWS';
 
 const BUILTIN = {
   DFM: [
     { symbol: 'EMAAR.DU', name: 'Emaar Properties' },
     { symbol: 'ENBD.DU', name: 'Emirates NBD' },
     { symbol: 'DIB.DU', name: 'Dubai Islamic Bank' },
-    { symbol: 'DEWA.DU', name: 'DEWA - Dubai Electricity & Water' },
+    { symbol: 'DEWA.DU', name: 'DEWA' },
     { symbol: 'DFM.DU', name: 'Dubai Financial Market' },
     { symbol: 'ARMX.DU', name: 'Aramex' },
     { symbol: 'DU.DU', name: 'du Telecom EITC' },
@@ -16,13 +18,11 @@ const BUILTIN = {
     { symbol: 'SALIK.DU', name: 'Salik Company' },
     { symbol: 'TECOM.DU', name: 'TECOM Group' },
     { symbol: 'EMAARDEV.DU', name: 'Emaar Development' },
-    { symbol: 'AZIZI.DU', name: 'Azizi Developments' },
     { symbol: 'PARKIN.DU', name: 'Parkin Company' },
+    { symbol: 'AIRARABIA.DU', name: 'Air Arabia' },
+    { symbol: 'TABREED.DU', name: 'National Central Cooling Tabreed' },
     { symbol: 'DUBAI.DU', name: 'Dubai Investments' },
     { symbol: 'SHUAA.DU', name: 'Shuaa Capital' },
-    { symbol: 'EIB.DU', name: 'Emirates Islamic Bank' },
-    { symbol: 'TABREED.DU', name: 'National Central Cooling Tabreed' },
-    { symbol: 'AIRARABIA.DU', name: 'Air Arabia' },
     { symbol: 'EMPOWER.DU', name: 'Emirates District Cooling Empower' },
   ],
   ADX: [
@@ -40,7 +40,6 @@ const BUILTIN = {
     { symbol: 'LULU.AD', name: 'Lulu Retail Holdings' },
     { symbol: 'ADNOC.AD', name: 'ADNOC Gas' },
     { symbol: 'PUREHEALTH.AD', name: 'Pure Health Holding' },
-    { symbol: 'PRESIGHT.AD', name: 'Presight AI' },
     { symbol: 'ADIB.AD', name: 'Abu Dhabi Islamic Bank' },
     { symbol: 'UNB.AD', name: 'Union National Bank' },
   ],
@@ -58,7 +57,6 @@ const BUILTIN = {
     { symbol: 'TATAMOTORS.NS', name: 'Tata Motors' },
     { symbol: 'HCLTECH.NS', name: 'HCL Technologies' },
     { symbol: 'AXISBANK.NS', name: 'Axis Bank' },
-    { symbol: 'KOTAKBANK.NS', name: 'Kotak Mahindra Bank' },
     { symbol: 'LT.NS', name: 'Larsen and Toubro' },
     { symbol: 'TITAN.NS', name: 'Titan Company' },
     { symbol: 'SUNPHARMA.NS', name: 'Sun Pharmaceutical' },
@@ -66,12 +64,6 @@ const BUILTIN = {
     { symbol: 'ONGC.NS', name: 'ONGC' },
     { symbol: 'ITC.NS', name: 'ITC Limited' },
     { symbol: 'HINDUNILVR.NS', name: 'Hindustan Unilever HUL' },
-    { symbol: 'ADANIENT.NS', name: 'Adani Enterprises' },
-    { symbol: 'ZOMATO.NS', name: 'Zomato' },
-    { symbol: 'HAL.NS', name: 'Hindustan Aeronautics HAL' },
-    { symbol: 'BEL.NS', name: 'Bharat Electronics BEL' },
-    { symbol: 'LICI.NS', name: 'Life Insurance Corporation LIC' },
-    { symbol: 'IRFC.NS', name: 'Indian Railway Finance' },
     { symbol: 'SUZLON.NS', name: 'Suzlon Energy' },
     { symbol: 'CGPOWER.NS', name: 'CG Power Industrial Solutions' },
     { symbol: 'CASTROLIND.NS', name: 'Castrol India' },
@@ -80,20 +72,22 @@ const BUILTIN = {
     { symbol: 'AEROENTER.NS', name: 'Aero Entertain' },
     { symbol: 'BEPL.NS', name: 'Bhansali Engineering Polymers BEPL' },
     { symbol: 'CEMPRO.NS', name: 'Cem Products Cempro' },
+    { symbol: 'CGPOWER.NS', name: 'CG Power' },
     { symbol: 'GENNEX.NS', name: 'Gennex Laboratories' },
     { symbol: 'IRCON.NS', name: 'Ircon International' },
     { symbol: 'KWIL.NS', name: 'Kernex Microsystems KWIL' },
     { symbol: 'SBC.NS', name: 'SBC Exports' },
     { symbol: 'TEXRAIL.NS', name: 'Texmaco Rail Engineering' },
     { symbol: 'TITANIN.NS', name: 'Titan Intech' },
+    { symbol: 'HAL.NS', name: 'Hindustan Aeronautics HAL' },
+    { symbol: 'BEL.NS', name: 'Bharat Electronics BEL' },
+    { symbol: 'LICI.NS', name: 'Life Insurance Corporation LIC' },
+    { symbol: 'IRFC.NS', name: 'Indian Railway Finance' },
+    { symbol: 'ZOMATO.NS', name: 'Zomato' },
+    { symbol: 'ADANIENT.NS', name: 'Adani Enterprises' },
     { symbol: 'YESBANK.NS', name: 'Yes Bank' },
-    { symbol: 'PNB.NS', name: 'Punjab National Bank' },
     { symbol: 'VEDL.NS', name: 'Vedanta' },
     { symbol: 'TATAPOWER.NS', name: 'Tata Power' },
-    { symbol: 'ADANIGREEN.NS', name: 'Adani Green Energy' },
-    { symbol: 'GODREJCP.NS', name: 'Godrej Consumer Products' },
-    { symbol: 'DABUR.NS', name: 'Dabur India' },
-    { symbol: 'MARICO.NS', name: 'Marico Parachute' },
     { symbol: 'DRREDDY.NS', name: 'Dr Reddys Laboratories' },
     { symbol: 'CIPLA.NS', name: 'Cipla' },
   ],
@@ -104,7 +98,7 @@ const BUILTIN = {
     { symbol: 'INFY.BO', name: 'Infosys' },
     { symbol: 'SBIN.BO', name: 'State Bank of India SBI' },
     { symbol: 'SUZLON.BO', name: 'Suzlon Energy' },
-    { symbol: 'CGPOWER.BO', name: 'CG Power Industrial Solutions' },
+    { symbol: 'CGPOWER.BO', name: 'CG Power' },
     { symbol: 'CASTROLIND.BO', name: 'Castrol India' },
     { symbol: 'LLOYDSENGG.BO', name: 'Lloyds Engineering Works' },
     { symbol: 'RAMASTEEL.BO', name: 'Rama Steel Tubes' },
@@ -115,68 +109,58 @@ const BUILTIN = {
   ],
 };
 
-// Convert Yahoo symbol to Stooq format
-function toStooq(symbol) {
-  if (symbol.endsWith('.DU')) return symbol.replace('.DU', '.DU'); // DFM
-  if (symbol.endsWith('.AD')) return symbol.replace('.AD', '.AD'); // ADX
-  if (symbol.endsWith('.NS')) return symbol.replace('.NS', '.NS'); // NSE
-  if (symbol.endsWith('.BO')) return symbol.replace('.BO', '.BO'); // BSE
-  return symbol + '.US'; // US stocks
+// Convert Yahoo-style symbol to Alpha Vantage format
+function toAV(symbol) {
+  // Alpha Vantage uses: NSE:RELIANCE, BSE:RELIANCE, DFM:EMAAR, etc.
+  if (symbol.endsWith('.NS')) return symbol.replace('.NS', '') + '.BSE'; // AV uses BSE for Indian
+  if (symbol.endsWith('.BO')) return symbol.replace('.BO', '') + '.BSE';
+  if (symbol.endsWith('.DU')) return symbol; // Try as-is
+  if (symbol.endsWith('.AD')) return symbol; // Try as-is
+  return symbol; // US stocks as-is
 }
 
-async function fetchPrice(symbol) {
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'application/json',
-  };
-
-  // Method 1: Yahoo Finance v8 chart (most reliable)
-  for (const base of ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com']) {
-    try {
-      const url = `${base}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-      const r = await fetch(url, { headers });
-      if (r.ok) {
-        const data = await r.json();
-        const meta = data?.chart?.result?.[0]?.meta;
-        if (meta?.regularMarketPrice) {
-          return {
-            price: meta.regularMarketPrice,
-            change24h: meta.regularMarketChangePercent || 0,
-            currency: meta.currency || 'USD',
-          };
-        }
-      }
-    } catch (e) {}
-  }
-
-  // Method 2: Stooq (good for international + some regional)
+async function fetchStockPrice(symbol) {
+  const headers = { 'User-Agent': 'Mozilla/5.0' };
+  
+  // Alpha Vantage GLOBAL_QUOTE - works for US, India, UAE
   try {
-    const stooqSym = symbol.toLowerCase().replace('.du', '.du').replace('.ad', '.ad').replace('.ns', '.ns').replace('.bo', '.bo');
-    const url = `https://stooq.com/q/l/?s=${stooqSym}&f=sd2t2ohlcv&h&e=json`;
-    const r = await fetch(url, { headers: { 'User-Agent': headers['User-Agent'] } });
-    const data = await r.json();
-    if (data?.symbols?.[0]?.close) {
-      const cur = symbol.endsWith('.DU') || symbol.endsWith('.AD') ? 'AED' :
-                  symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'INR' : 'USD';
-      return { price: parseFloat(data.symbols[0].close), change24h: 0, currency: cur };
-    }
-  } catch (e) {}
-
-  // Method 3: Yahoo Finance v7 quote
-  try {
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`;
+    const avSym = symbol.endsWith('.NS') || symbol.endsWith('.BO')
+      ? symbol.replace('.NS','').replace('.BO','') + '.BSE'
+      : symbol;
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSym)}&apikey=${AV_KEY}`;
     const r = await fetch(url, { headers });
     const data = await r.json();
-    const q = data?.quoteResponse?.result?.[0];
-    if (q?.regularMarketPrice) {
-      return {
-        price: q.regularMarketPrice,
-        change24h: q.regularMarketChangePercent || 0,
-        currency: q.currency || 'USD',
-      };
+    const quote = data['Global Quote'];
+    if (quote && quote['05. price'] && parseFloat(quote['05. price']) > 0) {
+      const price = parseFloat(quote['05. price']);
+      const prevClose = parseFloat(quote['08. previous close'] || quote['05. price']);
+      const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+      // Determine currency
+      const cur = (symbol.endsWith('.DU') || symbol.endsWith('.AD')) ? 'AED'
+                : (symbol.endsWith('.NS') || symbol.endsWith('.BO')) ? 'INR' : 'USD';
+      console.log('AV success:', symbol, price, cur);
+      return { price, change24h: change, currency: cur };
     }
-  } catch (e) {}
+  } catch(e) { console.log('AV failed:', symbol, e.message); }
 
+  // Fallback: try original symbol with Alpha Vantage
+  try {
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${AV_KEY}`;
+    const r = await fetch(url, { headers });
+    const data = await r.json();
+    const quote = data['Global Quote'];
+    if (quote && quote['05. price'] && parseFloat(quote['05. price']) > 0) {
+      const price = parseFloat(quote['05. price']);
+      const prevClose = parseFloat(quote['08. previous close'] || quote['05. price']);
+      const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+      const cur = (symbol.endsWith('.DU') || symbol.endsWith('.AD')) ? 'AED'
+                : (symbol.endsWith('.NS') || symbol.endsWith('.BO')) ? 'INR' : 'USD';
+      console.log('AV fallback success:', symbol, price);
+      return { price, change24h: change, currency: cur };
+    }
+  } catch(e) {}
+
+  console.log('All methods failed for:', symbol);
   return null;
 }
 
@@ -211,18 +195,24 @@ module.exports = async function handler(req, res) {
         return res.json({ results });
       }
 
-      // International via Yahoo
-      const url = 'https://query2.finance.yahoo.com/v1/finance/search?q=' +
-        encodeURIComponent(query) + '&lang=en-US&region=US&quotesCount=8&newsCount=0';
-      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-      const data = await r.json();
-      const quotes = (data.quotes || []).filter(q => q.symbol && !q.symbol.includes('.'));
-      return res.json({ results: quotes.slice(0, 8).map(q => ({
-        symbol: q.symbol,
-        name: q.longname || q.shortname || q.symbol,
-        exchange: q.exchDisp || 'NYSE/NASDAQ',
-        type: 'stock',
-      }))});
+      // International search via Alpha Vantage SYMBOL_SEARCH
+      try {
+        const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(query)}&apikey=${AV_KEY}`;
+        const r = await fetch(url);
+        const data = await r.json();
+        const matches = (data.bestMatches || [])
+          .filter(m => m['4. region'] === 'United States')
+          .slice(0, 6)
+          .map(m => ({
+            symbol: m['1. symbol'],
+            name: m['2. name'],
+            exchange: m['3. type'],
+            type: 'stock',
+          }));
+        return res.json({ results: matches });
+      } catch(e) {
+        return res.json({ results: [] });
+      }
     }
 
     // ── PRICES ──
@@ -233,31 +223,33 @@ module.exports = async function handler(req, res) {
       const cryptoList = symbolList.filter(s => s.startsWith('crypto:'));
       const stockList = symbolList.filter(s => !s.startsWith('crypto:'));
 
-      // Crypto via CoinGecko
+      // Crypto via CoinGecko (unlimited free)
       if (cryptoList.length > 0) {
         try {
           const ids = cryptoList.map(s => s.replace('crypto:', '')).join(',');
           const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`);
           const data = await r.json();
           for (const id in data) {
-            prices[`crypto:${id}`] = { price: data[id].usd, change24h: data[id].usd_24h_change || 0, currency: 'USD' };
+            prices[`crypto:${id}`] = {
+              price: data[id].usd,
+              change24h: data[id].usd_24h_change || 0,
+              currency: 'USD'
+            };
           }
-        } catch (e) {}
+        } catch(e) { console.log('CoinGecko error:', e.message); }
       }
 
-      // Stocks - fetch all in parallel
+      // Stocks via Alpha Vantage — fetch sequentially to avoid rate limit
       if (stockList.length > 0) {
-        const results = await Promise.all(stockList.map(async sym => {
-          const p = await fetchPrice(sym);
-          return { sym, p };
-        }));
-        for (const { sym, p } of results) {
+        for (const sym of stockList) {
+          const p = await fetchStockPrice(sym);
           if (p) prices[sym] = p;
+          // Small delay to avoid hitting rate limit
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
 
-      // Debug log
-      console.log('Price results:', JSON.stringify(prices));
+      console.log('Final prices:', JSON.stringify(prices));
       return res.json({ prices });
     }
 

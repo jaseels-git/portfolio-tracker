@@ -164,36 +164,57 @@ async function fetchPrice(symbol) {
     return null;
   }
 
-  // For Indian stocks: use Alpha Vantage with BSE suffix
+  // For Indian stocks: try Yahoo Finance first (same approach as UAE but with .NS/.BO)
   if (isIndia) {
     const baseSym = symbol.replace('.NS', '').replace('.BO', '');
-    const avSym = baseSym + '.BSE';
-    try {
-      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSym)}&apikey=${AV_KEY}`;
-      const r = await fetch(url);
-      const data = await r.json();
-      const q = data['Global Quote'];
-      if (q?.['05. price'] && parseFloat(q['05. price']) > 0) {
-        const price = parseFloat(q['05. price']);
-        const prev = parseFloat(q['08. previous close'] || q['05. price']);
-        console.log('AV India success:', symbol, avSym, price);
-        return { price, change24h: prev > 0 ? ((price - prev) / prev) * 100 : 0, currency: 'INR' };
+    // Try Yahoo Finance with original symbol (.NS/.BO work on Yahoo)
+    const yahooEndpoints = [
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
+    ];
+    const indHeaders = [
+      { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json', 'Referer': 'https://finance.yahoo.com' },
+      { 'User-Agent': 'python-requests/2.28.0', 'Accept': 'application/json' },
+      { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0', 'Accept': '*/*' },
+    ];
+    for (const url of yahooEndpoints) {
+      for (const headers of indHeaders) {
+        try {
+          const r = await fetch(url, { headers });
+          if (!r.ok) continue;
+          const data = await r.json();
+          const meta = data?.chart?.result?.[0]?.meta;
+          if (meta?.regularMarketPrice) {
+            console.log('Yahoo India success:', symbol, meta.regularMarketPrice);
+            return { price: meta.regularMarketPrice, change24h: meta.regularMarketChangePercent || 0, currency: 'INR' };
+          }
+          const q = data?.quoteResponse?.result?.[0];
+          if (q?.regularMarketPrice) {
+            console.log('Yahoo India v7 success:', symbol, q.regularMarketPrice);
+            return { price: q.regularMarketPrice, change24h: q.regularMarketChangePercent || 0, currency: 'INR' };
+          }
+        } catch(e) {}
       }
-    } catch(e) {}
-    // Fallback: try NSE suffix
-    try {
-      const avSym2 = baseSym + '.NSE';
-      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSym2)}&apikey=${AV_KEY}`;
-      const r = await fetch(url);
-      const data = await r.json();
-      const q = data['Global Quote'];
-      if (q?.['05. price'] && parseFloat(q['05. price']) > 0) {
-        const price = parseFloat(q['05. price']);
-        const prev = parseFloat(q['08. previous close'] || q['05. price']);
-        return { price, change24h: prev > 0 ? ((price - prev) / prev) * 100 : 0, currency: 'INR' };
-      }
-    } catch(e) {}
-    console.log('AV India failed for:', symbol);
+    }
+    // Fallback: Alpha Vantage BSE/NSE
+    for (const suffix of ['.BSE', '.NSE']) {
+      try {
+        const avSym = baseSym + suffix;
+        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSym)}&apikey=${AV_KEY}`;
+        const r = await fetch(url);
+        const data = await r.json();
+        const q = data['Global Quote'];
+        if (q?.['05. price'] && parseFloat(q['05. price']) > 0) {
+          const price = parseFloat(q['05. price']);
+          const prev = parseFloat(q['08. previous close'] || q['05. price']);
+          console.log('AV India success:', symbol, avSym, price);
+          return { price, change24h: prev > 0 ? ((price-prev)/prev)*100 : 0, currency: 'INR' };
+        }
+      } catch(e) {}
+      await new Promise(r => setTimeout(r, 200));
+    }
+    console.log('All India methods failed for:', symbol);
     return null;
   }
 

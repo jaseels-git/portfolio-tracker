@@ -325,38 +325,69 @@ module.exports = async function handler(req, res) {
         } catch (e) { console.error('CoinGecko:', e.message); }
       }
 
-      // Stock prices via Yahoo Finance
+      // Stock prices - try multiple sources
       if (stockList.length > 0) {
-        // Try each symbol individually for better UAE stock support
         const fetchPromises = stockList.map(async (symbol) => {
-          // Try v8 endpoint first (better for international stocks)
-          const urls = [
-            'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=1d',
-            'https://query2.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=1d',
-          ];
-          for (const url of urls) {
-            try {
-              const r = await fetch(url, {
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
-                  'Accept': 'application/json',
-                  'Accept-Language': 'en-US,en;q=0.9',
-                }
-              });
-              const data = await r.json();
-              const meta = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
-              if (meta && meta.regularMarketPrice) {
-                prices[symbol] = {
-                  price: meta.regularMarketPrice,
-                  change24h: meta.regularMarketChangePercent || 0,
-                  currency: meta.currency || 'USD',
-                };
-                break;
+          // Method 1: Yahoo Finance v8 chart API
+          const tryYahoo = async (base) => {
+            const url = base + '/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=1d&includePrePost=false';
+            const r = await fetch(url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://finance.yahoo.com',
+                'Origin': 'https://finance.yahoo.com',
               }
-            } catch (e) {
-              console.error('Yahoo chart error for ' + symbol + ':', e.message);
+            });
+            const data = await r.json();
+            const meta = data?.chart?.result?.[0]?.meta;
+            if (meta?.regularMarketPrice) {
+              prices[symbol] = {
+                price: meta.regularMarketPrice,
+                change24h: meta.regularMarketChangePercent || 0,
+                currency: meta.currency || 'USD',
+              };
+              return true;
             }
-          }
+            return false;
+          };
+
+          // Method 2: Yahoo Finance crumb-less quote API
+          const tryYahooQuote = async () => {
+            const url = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=' + encodeURIComponent(symbol);
+            const r = await fetch(url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                'Accept': 'application/json',
+                'Referer': 'https://finance.yahoo.com',
+              }
+            });
+            const data = await r.json();
+            const q = data?.quoteResponse?.result?.[0];
+            if (q?.regularMarketPrice) {
+              prices[symbol] = {
+                price: q.regularMarketPrice,
+                change24h: q.regularMarketChangePercent || 0,
+                currency: q.currency || 'USD',
+              };
+              return true;
+            }
+            return false;
+          };
+
+          // Try all methods in sequence
+          try {
+            if (await tryYahoo('https://query1.finance.yahoo.com')) return;
+          } catch(e) {}
+          try {
+            if (await tryYahoo('https://query2.finance.yahoo.com')) return;
+          } catch(e) {}
+          try {
+            if (await tryYahooQuote()) return;
+          } catch(e) {}
+
+          console.log('Could not fetch price for:', symbol);
         });
         await Promise.all(fetchPromises);
       }

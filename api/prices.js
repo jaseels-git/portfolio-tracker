@@ -327,25 +327,38 @@ module.exports = async function handler(req, res) {
 
       // Stock prices via Yahoo Finance
       if (stockList.length > 0) {
-        try {
-          const r = await fetch(
-            'https://query1.finance.yahoo.com/v7/finance/quote?symbols=' +
-            encodeURIComponent(stockList.join(',')) +
-            '&fields=regularMarketPrice,regularMarketChangePercent,currency',
-            { headers: { 'User-Agent': 'Mozilla/5.0' } }
-          );
-          const data = await r.json();
-          const result = (data && data.quoteResponse && data.quoteResponse.result) || [];
-          for (const q of result) {
-            if(q.regularMarketPrice){
-              prices[q.symbol] = {
-                price: q.regularMarketPrice,
-                change24h: q.regularMarketChangePercent || 0,
-                currency: q.currency || 'USD',
-              };
+        // Try each symbol individually for better UAE stock support
+        const fetchPromises = stockList.map(async (symbol) => {
+          // Try v8 endpoint first (better for international stocks)
+          const urls = [
+            'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=1d',
+            'https://query2.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=1d',
+          ];
+          for (const url of urls) {
+            try {
+              const r = await fetch(url, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+                  'Accept': 'application/json',
+                  'Accept-Language': 'en-US,en;q=0.9',
+                }
+              });
+              const data = await r.json();
+              const meta = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
+              if (meta && meta.regularMarketPrice) {
+                prices[symbol] = {
+                  price: meta.regularMarketPrice,
+                  change24h: meta.regularMarketChangePercent || 0,
+                  currency: meta.currency || 'USD',
+                };
+                break;
+              }
+            } catch (e) {
+              console.error('Yahoo chart error for ' + symbol + ':', e.message);
             }
           }
-        } catch (e) { console.error('Yahoo:', e.message); }
+        });
+        await Promise.all(fetchPromises);
       }
 
       return res.json({ prices });
@@ -358,4 +371,3 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 };
-

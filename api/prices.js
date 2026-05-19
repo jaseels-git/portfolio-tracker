@@ -337,11 +337,13 @@ module.exports = async function handler(req, res) {
           const data = await r.json();
           const result = (data && data.quoteResponse && data.quoteResponse.result) || [];
           for (const q of result) {
-            prices[q.symbol] = {
-              price: q.regularMarketPrice,
-              change24h: q.regularMarketChangePercent,
-              currency: q.currency || 'USD',
-            };
+            if(q.regularMarketPrice){
+              prices[q.symbol] = {
+                price: q.regularMarketPrice,
+                change24h: q.regularMarketChangePercent || 0,
+                currency: q.currency || 'USD',
+              };
+            }
           }
         } catch (e) { console.error('Yahoo:', e.message); }
       }
@@ -356,3 +358,4 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 };
+

@@ -134,14 +134,24 @@ async function fetchPrice(symbol) {
           // v8 chart response
           const meta = data?.chart?.result?.[0]?.meta;
           if (meta?.regularMarketPrice) {
-            console.log('Yahoo UAE success:', symbol, yahooSym, meta.regularMarketPrice);
-            return { price: meta.regularMarketPrice, change24h: meta.regularMarketChangePercent || 0, currency: 'AED' };
+            let uaePrice = meta.regularMarketPrice;
+          // Yahoo Finance sometimes returns UAE prices in fils (x100)
+          // Real UAE stock price ranges: most stocks 0.5-50 AED
+          // If price > 50, likely in fils - divide by 100
+          if (uaePrice > 50) {
+            console.log('UAE price sanity fix (fils->AED):', symbol, uaePrice, '->', uaePrice/100);
+            uaePrice = uaePrice / 100;
+          }
+          console.log('Yahoo UAE success:', symbol, yahooSym, uaePrice);
+          return { price: uaePrice, change24h: meta.regularMarketChangePercent || 0, currency: 'AED' };
           }
           // v7 quote response
           const q = data?.quoteResponse?.result?.[0];
           if (q?.regularMarketPrice) {
-            console.log('Yahoo UAE v7 success:', symbol, yahooSym, q.regularMarketPrice);
-            return { price: q.regularMarketPrice, change24h: q.regularMarketChangePercent || 0, currency: 'AED' };
+            let uaePrice2 = q.regularMarketPrice;
+            if (uaePrice2 > 50) uaePrice2 = uaePrice2 / 100;
+            console.log('Yahoo UAE v7 success:', symbol, yahooSym, uaePrice2);
+            return { price: uaePrice2, change24h: q.regularMarketChangePercent || 0, currency: 'AED' };
           }
         } catch(e) {}
       }

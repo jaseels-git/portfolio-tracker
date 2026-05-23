@@ -446,7 +446,14 @@ function drawPie(){
   if(typeof Chart==='undefined'){setTimeout(drawPie,300);return;}
   const c=document.getElementById('chartCanvas');if(!c)return;
   if(pie){pie.destroy();pie=null;}
-  const d=MKTS.map(m=>({name:m,v:H.filter(h=>h.market===m).reduce((s,h)=>s+calc(h).cU,0)})).filter(m=>m.v>0);
+  // If market tab selected, show holdings within that market as slices
+  let d;
+  if(dTab){
+    const mh=H.filter(h=>h.market===dTab);
+    d=mh.map(h=>({name:h.ticker||h.name,v:calc(h).cU,color:CLR[dTab]})).filter(m=>m.v>0);
+  } else {
+    d=MKTS.map(m=>({name:m,v:H.filter(h=>h.market===m).reduce((s,h)=>s+calc(h).cU,0),color:CLR[m]})).filter(m=>m.v>0);
+  }
   if(!d.length)return;
   pie=new Chart(c,{
     type:'doughnut',
@@ -454,7 +461,7 @@ function drawPie(){
       labels:d.map(m=>m.name),
       datasets:[{
         data:d.map(m=>m.v),
-        backgroundColor:d.map(m=>CLR[m.name]),
+        backgroundColor:d.map(m=>m.color||CLR[m.name]),
         borderWidth:3,
         borderColor:'#16120E',
         hoverOffset:6,
@@ -502,57 +509,88 @@ function render(){
 }
 
 // ── Dashboard ──
+function setDT(m){dTab=(dTab===m)?null:m;render();}
+
 function rDash(){
   const t=tots();
   const am=MKTS.filter(m=>H.some(h=>h.market===m));
-  if(!dTab||!am.includes(dTab))dTab=am[0]||null;
-  const bm=MKTS.map(m=>({name:m,v:H.filter(h=>h.market===m).reduce((s,h)=>s+calc(h).cU,0)})).filter(m=>m.v>0);
+  if(!H.length) return '<div class="empty" style="padding-top:30px"><div class="ei">📊</div><div class="et">Tap + to add your first holding</div></div>';
 
-  // Legend grid
+  // Chart data: all markets or just selected
+  const bm = dTab
+    ? [{name:dTab, v:H.filter(h=>h.market===dTab).reduce((s,h)=>s+calc(h).cU,0)}]
+    : MKTS.map(m=>({name:m,v:H.filter(h=>h.market===m).reduce((s,h)=>s+calc(h).cU,0)})).filter(m=>m.v>0);
+
+  // Legend
   let leg='<div class="legend-grid">';
   bm.forEach(function(m){
-    leg+='<div class="legend-pill"><div class="legend-dot" style="background:'+CLR[m.name]+'"></div><div><div class="legend-name">'+FLG[m.name]+' '+m.name+'</div><div class="legend-val">'+fU(m.v)+'</div></div><div class="legend-pct">'+(t.cU>0?((m.v/t.cU)*100).toFixed(1):'0')+'%</div></div>';
+    const total = dTab ? m.v : t.cU;
+    leg+='<div class="legend-pill"><div class="legend-dot" style="background:'+CLR[m.name]+'"></div><div><div class="legend-name">'+FLG[m.name]+' '+m.name+'</div><div class="legend-val">'+fU(m.v)+'</div></div><div class="legend-pct">'+(total>0?((m.v/total)*100).toFixed(1):'0')+'%</div></div>';
   });
   leg+='</div>';
 
-  if(!H.length) return '<div class="empty" style="padding-top:30px"><div class="ei">📊</div><div class="et">Tap + to add your first holding</div></div>';
-
-  // Market tabs
+  // Market tabs — ALL + each market
   let tabs='<div class="mkt-tabs">';
+  // ALL tab
+  const allActive = dTab===null;
+  tabs+='<div class="mkt-tab'+(allActive?' on':'')+'" onclick="setDT(null)" '+(allActive?'style="border-color:rgba(212,168,71,.5);background:rgba(212,168,71,.08)"':'')+'>'+
+    '<div class="mkt-tab-top"><span class="mkt-tab-flag">◉</span><span class="mkt-tab-name">ALL</span></div>'+
+    '<div class="mkt-tab-val">'+fU(t.cU)+'</div>'+
+    '<div class="mkt-tab-pl '+(t.plU>=0?'pos':'neg')+'">'+(t.plU>=0?'▲':'▼')+' '+fP(t.plP)+'</div>'+
+  '</div>';
   am.forEach(function(m){
     const mh=H.filter(h=>h.market===m);
     const mV=mh.reduce((s,h)=>s+calc(h).cU,0);
     const mI=mh.reduce((s,h)=>s+calc(h).iU,0);
-    const mPL=mV-mI,mPos=mPL>=0;
-    tabs+='<div class="mkt-tab'+(dTab===m?' on':'')+'" onclick="setDT(\''+m+'\')">';
-    tabs+='<div class="mkt-tab-top"><span class="mkt-tab-flag">'+FLG[m]+'</span><span class="mkt-tab-name">'+m+'</span></div>';
-    tabs+='<div class="mkt-tab-val">'+fU(mV)+'</div>';
-    tabs+='<div class="mkt-tab-pl '+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fP(mI>0?(mPL/mI)*100:0)+'</div>';
-    tabs+='</div>';
+    const mPL=mV-mI, mPos=mPL>=0, isAct=dTab===m;
+    tabs+='<div class="mkt-tab'+(isAct?' on':'')+'" onclick="setDT(\''+m+'\')" '+(isAct?'style="border-color:rgba(212,168,71,.5);background:rgba(212,168,71,.08)"':'')+'>'+
+      '<div class="mkt-tab-top"><span class="mkt-tab-flag">'+FLG[m]+'</span><span class="mkt-tab-name">'+m+'</span></div>'+
+      '<div class="mkt-tab-val">'+fU(mV)+'</div>'+
+      '<div class="mkt-tab-pl '+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fP(mI>0?(mPL/mI)*100:0)+'</div>'+
+    '</div>';
   });
   tabs+='</div>';
 
-  // Holdings under active tab
+  // Holdings list
+  const showH = dTab
+    ? H.filter(h=>h.market===dTab)
+    : [...H].sort((a,b)=>calc(b).cU-calc(a).cU);
+
   let rows='';
-  if(dTab){
-    const mh=H.filter(h=>h.market===dTab);
-    if(mh.length){
-      const mV=mh.reduce((s,h)=>s+calc(h).cU,0);
-      const mI=mh.reduce((s,h)=>s+calc(h).iU,0);
-      const mPL=mV-mI,mPos=mPL>=0,mPLP=mI>0?(mPL/mI)*100:0;
-      rows+='<div class="mkt-total"><div class="mkt-total-left"><div class="mkt-total-label">'+FLG[dTab]+' '+dTab+' Total</div><div class="mkt-total-val">'+fU(mV)+'</div><div class="mkt-total-sub">'+fA(mV*AR)+'</div></div><div class="mkt-total-pl"><div class="mkt-total-pl-val '+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fU(Math.abs(mPL))+'</div><div class="mkt-total-pl-pct '+(mPos?'pos':'neg')+'">'+fP(mPLP)+'</div><div class="mkt-total-invested">Invested: '+fU(mI)+'</div></div></div>';
-      rows+=mh.map(function(h){
-        const{cU,plP,plU}=calc(h),sym=SYM[h.currency],p2=plP>=0;
-        const init=(h.ticker||h.name).slice(0,2).toUpperCase();
-        return '<div class="dsr"><div style="display:flex;align-items:center;gap:10px"><div class="dsi" style="background:'+CLR[h.market]+'22;color:'+CLR[h.market]+'">'+init+'</div><div><div class="dsname">'+h.name+(h.livePrice?' <span style="color:#5DBF7F;font-size:9px">●</span>':'')+'</div><div class="dssub">'+h.symbol+' · '+h.shares+' units · '+sym+h.currentPrice+'</div></div></div><div><div class="dsval">'+fU(cU)+'</div><div class="dspl '+(p2?'pos':'neg')+'">'+(p2?'▲':'▼')+' '+fU(Math.abs(plU))+' · '+fP(plP)+'</div><div class="dsaed">'+fA(cU*AR)+'</div></div></div>';
-      }).join('');
-    } else {
-      rows='<div class="empty"><div class="ei">📭</div><div class="et">No '+dTab+' holdings yet</div></div>';
+  if(showH.length){
+    if(dTab){
+      const mV=showH.reduce((s,h)=>s+calc(h).cU,0);
+      const mI=showH.reduce((s,h)=>s+calc(h).iU,0);
+      const mPL=mV-mI, mPos=mPL>=0, mPLP=mI>0?(mPL/mI)*100:0;
+      rows+='<div class="mkt-total">'+
+        '<div class="mkt-total-left"><div class="mkt-total-label">'+FLG[dTab]+' '+dTab+' Total</div>'+
+        '<div class="mkt-total-val">'+fU(mV)+'</div>'+
+        '<div class="mkt-total-sub">'+fA(mV*AR)+'</div></div>'+
+        '<div class="mkt-total-pl">'+
+        '<div class="mkt-total-pl-val '+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fU(Math.abs(mPL))+'</div>'+
+        '<div class="mkt-total-pl-pct '+(mPos?'pos':'neg')+'">'+fP(mPLP)+'</div>'+
+        '<div class="mkt-total-invested">Invested: '+fU(mI)+'</div>'+
+        '</div></div>';
     }
+    rows+=showH.map(function(h){
+      const{cU,plP,plU}=calc(h), sym=SYM[h.currency], p2=plP>=0;
+      const init=(h.ticker||h.name).slice(0,2).toUpperCase();
+      return '<div class="dsr">'+
+        '<div style="display:flex;align-items:center;gap:10px">'+
+        '<div class="dsi" style="background:'+CLR[h.market]+'22;color:'+CLR[h.market]+'">'+init+'</div>'+
+        '<div><div class="dsname">'+h.name+(h.livePrice?' <span style="color:#5DBF7F;font-size:9px">●</span>':'')+'</div>'+
+        '<div class="dssub">'+h.symbol+' · '+h.shares+' units · '+sym+h.currentPrice+'</div></div></div>'+
+        '<div><div class="dsval">'+fU(cU)+'</div>'+
+        '<div class="dspl '+(p2?'pos':'neg')+'">'+(p2?'▲':'▼')+' '+fU(Math.abs(plU))+' · '+fP(plP)+'</div>'+
+        '<div class="dsaed">'+fA(cU*AR)+'</div></div></div>';
+    }).join('');
+  } else {
+    rows='<div class="empty"><div class="ei">📭</div><div class="et">No '+dTab+' holdings yet</div></div>';
   }
+
   return leg+'<div style="height:12px"></div>'+tabs+rows;
 }
-function setDT(m){dTab=m;render();}
+
 
 // ── Holdings ──
 function rHold(){

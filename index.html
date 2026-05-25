@@ -782,13 +782,24 @@ async function rfr(manual=false){
     const r=await fetch(API+'?action=prices&symbols='+encodeURIComponent(syms));
     const d=await r.json();
     if(d.prices){
+      console.log('Received prices:', JSON.stringify(d.prices));
       H=H.map(function(h){
         const k=(h.market==='Crypto'?'crypto:':'')+h.symbol;
         if(d.prices[k]){
-          const p=d.prices[k];let price=p.price;
-          const apiCur=p.currency||'USD';if(apiCur!==h.currency){const pUSD=apiCur==='USD'?price:apiCur==='AED'?price/AR:apiCur==='INR'?price/IR:price;price=h.currency==='USD'?pUSD:h.currency==='AED'?pUSD*AR:h.currency==='INR'?pUSD*IR:pUSD;}
-          return{...h,currentPrice:Math.round(price*1000)/1000,change24h:p.change24h||0,livePrice:true};
-        }return h;
+          const p=d.prices[k];
+          let price=p.price;
+          const apiCur=p.currency||'USD';
+          // Only convert if currencies differ
+          if(apiCur!==h.currency){
+            // Step 1: convert api price to USD
+            const priceUSD = apiCur==='AED'?price/AR:apiCur==='INR'?price/IR:price;
+            // Step 2: convert USD to holding currency
+            price = h.currency==='AED'?priceUSD*AR:h.currency==='INR'?priceUSD*IR:priceUSD;
+          }
+          console.log('Updated:', h.symbol, 'api:', p.price, apiCur, '-> stored:', price, h.currency);
+          return{...h,currentPrice:parseFloat(price.toFixed(4)),change24h:p.change24h||0,livePrice:true};
+        }
+        return h;
       });
       sv();lastRfr=new Date();upRlbl();render();
       if(manual)toast('Prices updated ✓');

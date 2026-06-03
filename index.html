@@ -782,22 +782,29 @@ async function rfr(manual=false){
     const r=await fetch(API+'?action=prices&symbols='+encodeURIComponent(syms));
     const d=await r.json();
     if(d.prices){
-      console.log('Received prices:', JSON.stringify(d.prices));
+      const priceKeys = Object.keys(d.prices);
+      console.log('Received', priceKeys.length, 'prices:', priceKeys.join(','));
+      
+      // Show debug toast always so we can see what's coming back
+      toast('API returned '+priceKeys.length+' prices: '+priceKeys.slice(0,3).join(', '));
+      
+      if(priceKeys.length === 0){
+        if(manual) toast('No prices returned from API — try again','error');
+        return;
+      }
+      
       H=H.map(function(h){
         const k=(h.market==='Crypto'?'crypto:':'')+h.symbol;
         if(d.prices[k]){
           const p=d.prices[k];
           let price=p.price;
           const apiCur=p.currency||'USD';
-          // Only convert if currencies differ
           if(apiCur!==h.currency){
-            // Step 1: convert api price to USD
             const priceUSD = apiCur==='AED'?price/AR:apiCur==='INR'?price/IR:price;
-            // Step 2: convert USD to holding currency
             price = h.currency==='AED'?priceUSD*AR:h.currency==='INR'?priceUSD*IR:priceUSD;
           }
           const finalPrice = parseFloat(price.toFixed(4));
-          console.log('Updated:', h.symbol, 'api:', p.price, apiCur, '-> stored:', finalPrice, h.currency);
+          console.log('Updated:', h.symbol, p.price, apiCur, '->', finalPrice, h.currency);
           return{...h,currentPrice:finalPrice,change24h:p.change24h||0,livePrice:true};
         }
         return h;
@@ -806,10 +813,8 @@ async function rfr(manual=false){
       lastRfr=new Date();
       upRlbl();
       render();
-      console.log('After save, H[0]:', JSON.stringify(H[0]));
       const updated = H.filter(h=>h.livePrice).length;
-      const total = H.length;
-      if(manual)toast('Updated '+updated+'/'+total+' prices ✓');
+      if(manual) toast('Updated '+updated+'/'+H.length+' stocks ✓');
     }
   }catch(e){if(manual)toast('Could not fetch prices','error');}
   finally{if(rb){rb.disabled=false;rb.textContent='🔄 Refresh';}}

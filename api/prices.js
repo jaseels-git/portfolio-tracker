@@ -1,5 +1,6 @@
 // api/prices.js v3 — Multi-source with UAE scraping
 const AV_KEY = 'ZMF8T0GYQONK8CWS';
+const EODHD_KEY = '6a21c5fe9728f1.62217913';
 
 const BUILTIN = {
   DFM: [
@@ -107,180 +108,60 @@ function toYahooAE(symbol) {
   return symbol.replace('.DU', '.AE').replace('.AD', '.AE');
 }
 
-// Fetch UAE stock price - multiple methods
+// Fetch UAE stock price via EODHD (reliable, supports DFM/ADX)
 async function fetchUAE(symbol) {
-  const yahooSym = toYahooAE(symbol);
   const ticker = symbol.replace('.DU','').replace('.AD','');
-  const H = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'application/json',
-    'Referer': 'https://finance.yahoo.com',
-  };
+  const exchange = symbol.endsWith('.DU') ? 'DFM' : 'ADX';
+  const eodSymbol = ticker + '.' + exchange;
 
-  // Method 0: DFM/ADX official website API
+  // Method 1: EODHD real-time price (most reliable for UAE)
   try {
-    const exchange = symbol.endsWith('.DU') ? 'DFM' : 'ADX';
-    const dfmUrl = `https://www.dfm.ae/the-exchange/market-information/company/${ticker}/trading/trading-summary`;
-    const adxUrl = `https://www.adx.ae/en/pages/companydetails.aspx?symbol=${ticker}`;
-    const url = symbol.endsWith('.DU') ? dfmUrl : adxUrl;
-    const r = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      }
-    });
-    const html = await r.text();
-    // Look for price patterns in the DFM page
-    const patterns = [
-      /Last\s+Price[^0-9]*([0-9]+\.?[0-9]*)/i,
-      /lastPrice[^>]*>([0-9]+\.?[0-9]*)/,
-      /"last_price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
-      /"price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
-      /class="[^"]*price[^"]*"[^>]*>([0-9]+\.?[0-9]*)/i,
-      /([0-9]+\.[0-9]{1,4})\s*AED/i,
-    ];
-    for (const pat of patterns) {
-      const match = html.match(pat);
-      if (match && match[1]) {
-        const raw = parseFloat(match[1]);
-        if (raw > 0.1 && raw < 1000) {
-          console.log('DFM/ADX official success:', symbol, raw);
-          return {price: raw, change24h: 0, currency: 'AED'};
-        }
-      }
+    const url = `https://eodhd.com/api/real-time/${eodSymbol}?api_token=${EODHD_KEY}&fmt=json`;
+    const r = await fetch(url);
+    const d = await r.json();
+    if (d && d.close && parseFloat(d.close) > 0) {
+      const price = parseFloat(d.close);
+      const prev = parseFloat(d.previousClose || d.close);
+      const change = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+      console.log('EODHD success:', symbol, eodSymbol, price);
+      return {price, change24h: change, currency: 'AED'};
     }
-  } catch(e) { console.log('DFM official failed:', symbol, e.message); }
+  } catch(e) { console.log('EODHD failed:', symbol, e.message); }
 
-  // Method 1: Yahoo Finance .AE
+  // Method 2: EODHD end-of-day as fallback
+  try {
+    const url = `https://eodhd.com/api/eod/${eodSymbol}?api_token=${EODHD_KEY}&fmt=json&order=d&limit=1`;
+    const r = await fetch(url);
+    const d = await r.json();
+    if (d && d[0] && d[0].close > 0) {
+      console.log('EODHD EOD success:', symbol, d[0].close);
+      return {price: d[0].close, change24h: 0, currency: 'AED'};
+    }
+  } catch(e) {}
+
+  // Method 3: Yahoo Finance .AE as backup
+  const yahooSym = symbol.replace('.DU','.AE').replace('.AD','.AE');
   for (const base of ['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com']) {
     try {
-      const r = await fetch(`${base}/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=1d&range=1d`, {headers:H});
+      const r = await fetch(`${base}/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=1d&range=1d`, {
+        headers: {'User-Agent':'Mozilla/5.0','Accept':'application/json','Referer':'https://finance.yahoo.com'}
+      });
       if (!r.ok) continue;
       const d = await r.json();
       const m = d?.chart?.result?.[0]?.meta;
       if (m?.regularMarketPrice) {
         const price = fixUAE(m.regularMarketPrice);
-        console.log('Yahoo AE success:', symbol, m.regularMarketPrice, '->', price);
+        console.log('Yahoo AE backup success:', symbol, price);
         return {price, change24h: m.regularMarketChangePercent||0, currency:'AED'};
       }
     } catch(e) {}
   }
 
-  // Method 2: Yahoo Finance v7 quote
-  try {
-    const r = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(yahooSym)}`, {headers:H});
-    const d = await r.json();
-    const q = d?.quoteResponse?.result?.[0];
-    if (q?.regularMarketPrice) {
-      const price = fixUAE(q.regularMarketPrice);
-      console.log('Yahoo v7 success:', symbol, q.regularMarketPrice, '->', price);
-      return {price, change24h: q.regularMarketChangePercent||0, currency:'AED'};
-    }
-  } catch(e) {}
-
-  // Method 3: Try Investing.com UAE stocks
-  try {
-    const invMap = {
-      'PARKIN.DU': 'parkin-company',
-      'EMAAR.DU': 'emaar-properties',
-      'ENBD.DU': 'emirates-nbd',
-      'DIB.DU': 'dubai-islamic-bank',
-      'DEWA.DU': 'dubai-electricity-water-authority',
-      'DU.DU': 'du-telecom',
-      'AIRARABIA.DU': 'air-arabia',
-      'SALIK.DU': 'salik',
-      'DAMAC.DU': 'damac-properties',
-      'LULU.AD': 'lulu-retail',
-      'ETISALAT.AD': 'emirates-telecom',
-      'FAB.AD': 'first-abu-dhabi-bank',
-      'ADCB.AD': 'abu-dhabi-commercial-bank',
-      'ALDAR.AD': 'aldar-properties',
-      'IHC.AD': 'international-holding',
-      'ADIB.AD': 'abu-dhabi-islamic-bank',
-      'ADNOCDIST.AD': 'adnoc-distribution',
-      'TAQA.AD': 'taqa',
-      'ADPORTS.AD': 'ad-ports',
-      'PUREHEALTH.AD': 'pure-health',
-    };
-    const slug = invMap[symbol];
-    if (slug) {
-      const url = 'https://www.investing.com/equities/' + slug;
-      const r = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html',
-          'Accept-Language': 'en-US,en;q=0.9',
-        }
-      });
-      const html = await r.text();
-      // Find price in meta tags or structured data
-      const patterns = [
-        /"price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
-        /class="text-5xl[^"]*">([0-9]+\.?[0-9]*)</,
-        /"regularMarketPrice"\s*:\s*([0-9]+\.?[0-9]*)/,
-        /data-test="instrument-price-last">([0-9]+\.?[0-9]*)/,
-        /<span[^>]*last-price[^>]*>([0-9]+\.?[0-9]*)/,
-      ];
-      for (const pat of patterns) {
-        const match = html.match(pat);
-        if (match && match[1]) {
-          const raw = parseFloat(match[1]);
-          if (raw > 0 && raw < 10000) {
-            const price = fixUAE(raw);
-            console.log('Investing.com success:', symbol, raw, '->', price);
-            return {price, change24h:0, currency:'AED'};
-          }
-        }
-      }
-    }
-  } catch(e) { console.log('Investing.com failed:', symbol); }
-
-  // Method 3b: Try stockanalysis.com
-  try {
-    const exchange = symbol.endsWith('.DU') ? 'dfm' : 'adx';
-    const url = 'https://stockanalysis.com/quote/'+exchange+'/'+ticker.toLowerCase()+'/';
-    const r = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-      }
-    });
-    const html = await r.text();
-    const patterns = [
-      /"price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
-      /data-value="([0-9]+\.?[0-9]*)"/,
-      /"regularMarketPrice"\s*:\s*([0-9]+\.?[0-9]*)/,
-    ];
-    for (const pat of patterns) {
-      const match = html.match(pat);
-      if (match && match[1]) {
-        const raw = parseFloat(match[1]);
-        if (raw > 0 && raw < 10000) {
-          const price = fixUAE(raw);
-          console.log('StockAnalysis success:', symbol, raw, '->', price);
-          return {price, change24h:0, currency:'AED'};
-        }
-      }
-    }
-  } catch(e) {}
-
-  // Method 4: Alpha Vantage with bare ticker
-  try {
-    const r = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${AV_KEY}`);
-    const d = await r.json();
-    const q = d['Global Quote'];
-    if (q?.['05. price'] && parseFloat(q['05. price']) > 0) {
-      const raw = parseFloat(q['05. price']);
-      const price = fixUAE(raw);
-      console.log('AV UAE success:', symbol, raw, '->', price);
-      return {price, change24h:0, currency:'AED'};
-    }
-  } catch(e) {}
-
   console.log('All UAE methods failed:', symbol);
   return null;
 }
+
+
 
 // Fetch Indian stock price
 async function fetchIndia(symbol) {

@@ -117,6 +117,41 @@ async function fetchUAE(symbol) {
     'Referer': 'https://finance.yahoo.com',
   };
 
+  // Method 0: DFM/ADX official website API
+  try {
+    const exchange = symbol.endsWith('.DU') ? 'DFM' : 'ADX';
+    const dfmUrl = `https://www.dfm.ae/the-exchange/market-information/company/${ticker}/trading/trading-summary`;
+    const adxUrl = `https://www.adx.ae/en/pages/companydetails.aspx?symbol=${ticker}`;
+    const url = symbol.endsWith('.DU') ? dfmUrl : adxUrl;
+    const r = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
+    });
+    const html = await r.text();
+    // Look for price patterns in the DFM page
+    const patterns = [
+      /Last\s+Price[^0-9]*([0-9]+\.?[0-9]*)/i,
+      /lastPrice[^>]*>([0-9]+\.?[0-9]*)/,
+      /"last_price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
+      /"price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
+      /class="[^"]*price[^"]*"[^>]*>([0-9]+\.?[0-9]*)/i,
+      /([0-9]+\.[0-9]{1,4})\s*AED/i,
+    ];
+    for (const pat of patterns) {
+      const match = html.match(pat);
+      if (match && match[1]) {
+        const raw = parseFloat(match[1]);
+        if (raw > 0.1 && raw < 1000) {
+          console.log('DFM/ADX official success:', symbol, raw);
+          return {price: raw, change24h: 0, currency: 'AED'};
+        }
+      }
+    }
+  } catch(e) { console.log('DFM official failed:', symbol, e.message); }
+
   // Method 1: Yahoo Finance .AE
   for (const base of ['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com']) {
     try {
@@ -144,10 +179,67 @@ async function fetchUAE(symbol) {
     }
   } catch(e) {}
 
-  // Method 3: Try stockanalysis.com
+  // Method 3: Try Investing.com UAE stocks
+  try {
+    const invMap = {
+      'PARKIN.DU': 'parkin-company',
+      'EMAAR.DU': 'emaar-properties',
+      'ENBD.DU': 'emirates-nbd',
+      'DIB.DU': 'dubai-islamic-bank',
+      'DEWA.DU': 'dubai-electricity-water-authority',
+      'DU.DU': 'du-telecom',
+      'AIRARABIA.DU': 'air-arabia',
+      'SALIK.DU': 'salik',
+      'DAMAC.DU': 'damac-properties',
+      'LULU.AD': 'lulu-retail',
+      'ETISALAT.AD': 'emirates-telecom',
+      'FAB.AD': 'first-abu-dhabi-bank',
+      'ADCB.AD': 'abu-dhabi-commercial-bank',
+      'ALDAR.AD': 'aldar-properties',
+      'IHC.AD': 'international-holding',
+      'ADIB.AD': 'abu-dhabi-islamic-bank',
+      'ADNOCDIST.AD': 'adnoc-distribution',
+      'TAQA.AD': 'taqa',
+      'ADPORTS.AD': 'ad-ports',
+      'PUREHEALTH.AD': 'pure-health',
+    };
+    const slug = invMap[symbol];
+    if (slug) {
+      const url = 'https://www.investing.com/equities/' + slug;
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html',
+          'Accept-Language': 'en-US,en;q=0.9',
+        }
+      });
+      const html = await r.text();
+      // Find price in meta tags or structured data
+      const patterns = [
+        /"price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
+        /class="text-5xl[^"]*">([0-9]+\.?[0-9]*)</,
+        /"regularMarketPrice"\s*:\s*([0-9]+\.?[0-9]*)/,
+        /data-test="instrument-price-last">([0-9]+\.?[0-9]*)/,
+        /<span[^>]*last-price[^>]*>([0-9]+\.?[0-9]*)/,
+      ];
+      for (const pat of patterns) {
+        const match = html.match(pat);
+        if (match && match[1]) {
+          const raw = parseFloat(match[1]);
+          if (raw > 0 && raw < 10000) {
+            const price = fixUAE(raw);
+            console.log('Investing.com success:', symbol, raw, '->', price);
+            return {price, change24h:0, currency:'AED'};
+          }
+        }
+      }
+    }
+  } catch(e) { console.log('Investing.com failed:', symbol); }
+
+  // Method 3b: Try stockanalysis.com
   try {
     const exchange = symbol.endsWith('.DU') ? 'dfm' : 'adx';
-    const url = `https://stockanalysis.com/quote/${exchange}/${ticker.toLowerCase()}/`;
+    const url = 'https://stockanalysis.com/quote/'+exchange+'/'+ticker.toLowerCase()+'/';
     const r = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -155,7 +247,6 @@ async function fetchUAE(symbol) {
       }
     });
     const html = await r.text();
-    // Try to find price in page
     const patterns = [
       /"price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
       /data-value="([0-9]+\.?[0-9]*)"/,
@@ -356,4 +447,3 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({error:err.message});
   }
 };
-

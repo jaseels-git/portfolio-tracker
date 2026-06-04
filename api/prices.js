@@ -1,5 +1,5 @@
-// api/prices.js v3.1 — Multi-source with corrected frontend parameter mapping
-const AV_KEY = 'ZMF8T0GYONK8CWS';
+// api/prices.js v3 — Multi-source with UAE scraping
+const AV_KEY = 'ZMF8T0GYQONK8CWS';
 
 const BUILTIN = {
   DFM: [
@@ -97,14 +97,17 @@ const BUILTIN = {
   ],
 };
 
+// Fix UAE: Yahoo returns in fils (x100), convert to AED
 function fixUAE(price) {
   return price > 50 ? price / 100 : price;
 }
 
+// UAE symbol -> Yahoo .AE symbol
 function toYahooAE(symbol) {
   return symbol.replace('.DU', '.AE').replace('.AD', '.AE');
 }
 
+// Fetch UAE stock price - multiple methods
 async function fetchUAE(symbol) {
   const yahooSym = toYahooAE(symbol);
   const ticker = symbol.replace('.DU','').replace('.AD','');
@@ -114,6 +117,7 @@ async function fetchUAE(symbol) {
     'Referer': 'https://finance.yahoo.com',
   };
 
+  // Method 1: Yahoo Finance .AE
   for (const base of ['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com']) {
     try {
       const r = await fetch(`${base}/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=1d&range=1d`, {headers:H});
@@ -128,6 +132,7 @@ async function fetchUAE(symbol) {
     } catch(e) {}
   }
 
+  // Method 2: Yahoo Finance v7 quote
   try {
     const r = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(yahooSym)}`, {headers:H});
     const d = await r.json();
@@ -139,6 +144,7 @@ async function fetchUAE(symbol) {
     }
   } catch(e) {}
 
+  // Method 3: Try stockanalysis.com
   try {
     const exchange = symbol.endsWith('.DU') ? 'dfm' : 'adx';
     const url = `https://stockanalysis.com/quote/${exchange}/${ticker.toLowerCase()}/`;
@@ -149,6 +155,7 @@ async function fetchUAE(symbol) {
       }
     });
     const html = await r.text();
+    // Try to find price in page
     const patterns = [
       /"price"\s*:\s*"?([0-9]+\.?[0-9]*)"?/,
       /data-value="([0-9]+\.?[0-9]*)"/,
@@ -167,6 +174,7 @@ async function fetchUAE(symbol) {
     }
   } catch(e) {}
 
+  // Method 4: Alpha Vantage with bare ticker
   try {
     const r = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${AV_KEY}`);
     const d = await r.json();
@@ -183,6 +191,7 @@ async function fetchUAE(symbol) {
   return null;
 }
 
+// Fetch Indian stock price
 async function fetchIndia(symbol) {
   const H = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -190,6 +199,7 @@ async function fetchIndia(symbol) {
     'Referer': 'https://finance.yahoo.com',
   };
 
+  // Method 1: Yahoo Finance with .NS/.BO
   for (const base of ['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com']) {
     for (const ua of [H['User-Agent'], 'python-requests/2.28.0']) {
       try {
@@ -206,6 +216,7 @@ async function fetchIndia(symbol) {
     }
   }
 
+  // Method 2: Alpha Vantage BSE/NSE
   const base = symbol.replace('.NS','').replace('.BO','');
   for (const sfx of ['.BSE','.NSE']) {
     try {
@@ -226,6 +237,7 @@ async function fetchIndia(symbol) {
   return null;
 }
 
+// Fetch US/International stock
 async function fetchUS(symbol) {
   try {
     const r = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${AV_KEY}`);
@@ -241,41 +253,45 @@ async function fetchUS(symbol) {
   return null;
 }
 
+async function fetchPrice(symbol) {
+  if (symbol.endsWith('.DU')||symbol.endsWith('.AD')) return fetchUAE(symbol);
+  if (symbol.endsWith('.NS')||symbol.endsWith('.BO')) return fetchIndia(symbol);
+  return fetchUS(symbol);
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Access-Control-Allow-Methods','GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
   if (req.method==='OPTIONS') return res.status(200).end();
 
-  // ROUTING FIX: Handle frontend requests whether they use action=prices, stocks=..., or symbols=...
-  let { action, symbols, stocks, query, market } = req.query;
-  const targetStocks = symbols || stocks; 
+  const {action,symbols,query,market} = req.query;
 
   try {
-    // ── SEARCH ROUTE ──
-    if (action === 'search' || query) {
-      const searchStr = (query || '').toLowerCase();
-      if (!searchStr) return res.json({results:[]});
+    // ── SEARCH ──
+    if (action==='search') {
+      if (!query||query.length<1) return res.json({results:[]});
+      const q = query.toLowerCase();
 
-      if (market && BUILTIN[market.toUpperCase()]) {
-        const results = BUILTIN[market.toUpperCase()]
-          .filter(s=>s.name.toLowerCase().includes(searchStr)||s.symbol.toLowerCase().includes(searchStr))
+      if (BUILTIN[market]) {
+        const results = BUILTIN[market]
+          .filter(s=>s.name.toLowerCase().includes(q)||s.symbol.toLowerCase().includes(q))
           .slice(0,8)
           .map(s=>({symbol:s.symbol,name:s.name,exchange:market,type:'stock'}));
-        return results;
+        return res.json({results});
       }
 
-      if (market === 'Crypto' || searchStr.startsWith('crypto:')) {
-        const cleanedQuery = searchStr.replace('crypto:','');
-        const r = await fetch('https://api.coingecko.com/api/v3/search?query='+encodeURIComponent(cleanedQuery));
+      if (market==='Crypto') {
+        const r = await fetch('https://api.coingecko.com/api/v3/search?query='+encodeURIComponent(query));
         const d = await r.json();
         return res.json({results:(d.coins||[]).slice(0,8).map(c=>({
           symbol:c.id,name:c.name,exchange:'Crypto',type:'crypto',thumb:c.thumb
         }))});
       }
 
+      // International search via AV
       try {
-        const r = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(searchStr)}&apikey=${AV_KEY}`);
+        const r = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(query)}&apikey=${AV_KEY}`);
         const d = await r.json();
         const matches = (d.bestMatches||[])
           .filter(m=>m['4. region']==='United States')
@@ -285,15 +301,16 @@ module.exports = async function handler(req, res) {
       } catch(e) { return res.json({results:[]}); }
     }
 
-    // ── PRICES ROUTE ──
-    if (action === 'prices' || targetStocks) {
-      if (!targetStocks) return res.json({});
+    // ── PRICES ──
+    if (action==='prices') {
+      if (!symbols) return res.json({prices:{}});
       const prices = {};
-      const list = targetStocks.split(',').map(s=>s.trim()).filter(Boolean);
+      const list = symbols.split(',').map(s=>s.trim()).filter(Boolean);
       const cryptos = list.filter(s=>s.startsWith('crypto:'));
-      const stocksList = list.filter(s=>!s.startsWith('crypto:'));
+      const stocks = list.filter(s=>!s.startsWith('crypto:'));
 
-      if (cryptos.length > 0) {
+      // Crypto via CoinGecko (free, reliable)
+      if (cryptos.length>0) {
         try {
           const ids = cryptos.map(s=>s.replace('crypto:','')).join(',');
           const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`);
@@ -304,21 +321,25 @@ module.exports = async function handler(req, res) {
         } catch(e) {}
       }
 
-      const uae = stocksList.filter(s=>s.endsWith('.DU')||s.endsWith('.AD'));
-      const india = stocksList.filter(s=>s.endsWith('.NS')||s.endsWith('.BO'));
-      const intl = stocksList.filter(s=>!s.endsWith('.DU')&&!s.endsWith('.AD')&&!s.endsWith('.NS')&&!s.endsWith('.BO'));
+      // UAE stocks in parallel (no rate limit on Yahoo)
+      const uae = stocks.filter(s=>s.endsWith('.DU')||s.endsWith('.AD'));
+      const india = stocks.filter(s=>s.endsWith('.NS')||s.endsWith('.BO'));
+      const intl = stocks.filter(s=>!s.endsWith('.DU')&&!s.endsWith('.AD')&&!s.endsWith('.NS')&&!s.endsWith('.BO'));
 
-      if (uae.length > 0) {
+      // UAE parallel
+      if (uae.length>0) {
         const results = await Promise.all(uae.map(async s=>({s,p:await fetchUAE(s)})));
         for (const {s,p} of results) { if(p) prices[s]=p; }
       }
 
+      // India sequential (AV rate limit fallback)
       for (const s of india) {
         const p = await fetchIndia(s);
         if (p) prices[s]=p;
         await new Promise(r=>setTimeout(r,250));
       }
 
+      // International sequential
       for (const s of intl) {
         const p = await fetchUS(s);
         if (p) prices[s]=p;
@@ -326,14 +347,13 @@ module.exports = async function handler(req, res) {
       }
 
       console.log('Final prices:', JSON.stringify(prices));
-      
-      // Return a flat structure so both formatting styles match frontend expectations safely
-      return res.json({ ...prices, prices: prices });
+      return res.json({prices});
     }
 
-    return res.status(400).json({error:'Provide search parameters or stock identifiers.'});
+    return res.status(400).json({error:'Use action=search or action=prices'});
   } catch(err) {
     console.error('Error:',err.message);
     return res.status(500).json({error:err.message});
   }
 };
+

@@ -776,48 +776,49 @@ function delH(id){if(!confirm('Remove this holding?'))return;H=H.filter(h=>h.id!
 // ── Live Prices ──
 async function rfr(manual=false){
   if(!H.length)return;
-  const rb=document.getElementById('rb');if(rb){rb.disabled=true;rb.textContent='Refreshing...';}
+  const rb=document.getElementById('rb');
+  if(rb){rb.disabled=true;rb.textContent='Refreshing...';}
   const syms=H.map(h=>(h.market==='Crypto'?'crypto:':'')+h.symbol).join(',');
   try{
     const r=await fetch(API+'?action=prices&symbols='+encodeURIComponent(syms));
     const d=await r.json();
-    if(d.prices){
-      const priceKeys = Object.keys(d.prices);
-      console.log('Received', priceKeys.length, 'prices:', priceKeys.join(','));
-      
-      // Show debug toast always so we can see what's coming back
-      toast('API returned '+priceKeys.length+' prices: '+priceKeys.slice(0,3).join(', '));
-      
-      if(priceKeys.length === 0){
-        if(manual) toast('No prices returned from API — try again','error');
-        return;
-      }
-      
-      H=H.map(function(h){
-        const k=(h.market==='Crypto'?'crypto:':'')+h.symbol;
-        if(d.prices[k]){
-          const p=d.prices[k];
-          let price=p.price;
-          const apiCur=p.currency||'USD';
-          if(apiCur!==h.currency){
-            const priceUSD = apiCur==='AED'?price/AR:apiCur==='INR'?price/IR:price;
-            price = h.currency==='AED'?priceUSD*AR:h.currency==='INR'?priceUSD*IR:priceUSD;
-          }
-          const finalPrice = parseFloat(price.toFixed(4));
-          console.log('Updated:', h.symbol, p.price, apiCur, '->', finalPrice, h.currency);
-          return{...h,currentPrice:finalPrice,change24h:p.change24h||0,livePrice:true};
-        }
-        return h;
-      });
-      sv();
-      lastRfr=new Date();
-      upRlbl();
-      render();
-      const updated = H.filter(h=>h.livePrice).length;
-      if(manual) toast('Updated '+updated+'/'+H.length+' stocks ✓');
+    const priceKeys=Object.keys(d.prices||{});
+    console.log('Got prices for:',priceKeys);
+    if(priceKeys.length===0){
+      if(manual)toast('No prices received — market may be closed','error');
+      if(rb){rb.disabled=false;rb.textContent='🔄 Refresh';}
+      return;
     }
-  }catch(e){if(manual)toast('Could not fetch prices','error');}
-  finally{if(rb){rb.disabled=false;rb.textContent='🔄 Refresh';}}
+    // Update each holding that has a matching price
+    let updated=0;
+    H=H.map(function(h){
+      const k=(h.market==='Crypto'?'crypto:':'')+h.symbol;
+      const p=d.prices[k];
+      if(!p||!p.price||isNaN(p.price)) return h;
+      let price=parseFloat(p.price);
+      if(isNaN(price)||price<=0) return h;
+      const apiCur=p.currency||'USD';
+      // Convert currency if needed
+      if(apiCur!==h.currency){
+        const usd=apiCur==='AED'?price/AR:apiCur==='INR'?price/IR:price;
+        price=h.currency==='AED'?usd*AR:h.currency==='INR'?usd*IR:usd;
+      }
+      price=Math.round(price*10000)/10000;
+      console.log(h.symbol,'updated to',price,h.currency,'(was',h.currentPrice,')');
+      updated++;
+      return{...h,currentPrice:price,change24h:p.change24h||0,livePrice:true};
+    });
+    sv();
+    lastRfr=new Date();
+    upRlbl();
+    render();
+    if(manual)toast('Updated '+updated+' of '+H.length+' prices ✓');
+  }catch(e){
+    console.error('rfr error:',e);
+    if(manual)toast('Refresh failed: '+e.message,'error');
+  }finally{
+    if(rb){rb.disabled=false;rb.textContent='🔄 Refresh';}
+  }
 }
 function upRlbl(){const el=document.getElementById('rl');if(!el||!lastRfr)return;const m=Math.round((Date.now()-lastRfr)/60000);el.textContent=m===0?'just now':m+'m ago';}
 

@@ -497,7 +497,28 @@ function go(t){
   render();
 }
 function render(){
-  upHdr();
+  // Update header stats based on current market filter
+  if(TAB==='d' && dTab){
+    // Show stats for selected market only
+    const mh=H.filter(h=>h.market===dTab);
+    const mV=mh.reduce((s,h)=>s+calc(h).cU,0);
+    const mI=mh.reduce((s,h)=>s+calc(h).iU,0);
+    const mPL=mV-mI, mPos=mPL>=0, mPLP=mI>0?(mPL/mI)*100:0;
+    document.getElementById('hv').textContent=fU(mV);
+    document.getElementById('ha').textContent=fA(mV*AR);
+    document.getElementById('hi').textContent=fU(mI);
+    const hp=document.getElementById('hp');
+    hp.textContent=(mPos?'▲ ':'▼ ')+fU(Math.abs(mPL));
+    hp.className='stat-val '+(mPos?'pos':'neg');
+    const hpc=document.getElementById('hpc');
+    hpc.textContent=fP(mPLP);
+    hpc.className='stat-sub '+(mPos?'pos':'neg');
+    const hpa=document.getElementById('hpa');
+    hpa.textContent=(mPos?'▲ ':'▼ ')+fA(Math.abs(mPL*AR));
+    hpa.className='stat-val '+(mPos?'pos':'neg');
+  } else {
+    upHdr();
+  }
   // Show/hide chart section
   const cs=document.getElementById('chart-section');
   const ss=document.querySelector('.stats-strip');

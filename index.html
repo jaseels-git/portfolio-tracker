@@ -174,6 +174,8 @@ body::before{content:'';position:fixed;inset:0;
 .hsb{color:var(--dim);font-size:11px;margin-top:3px}
 .hv{font-size:15px;font-weight:600;text-align:right;color:var(--text)}
 .ha{color:var(--dim);font-size:11px;margin-top:2px;text-align:right}
+.hv-aed{font-size:15px;font-weight:600;text-align:right;color:var(--text)}
+.ha-usd{color:var(--dim);font-size:11px;margin-top:2px;text-align:right}
 
 /* P&L BOX */
 .plbox{
@@ -298,8 +300,8 @@ input:focus{border-color:rgba(212,168,71,.5)}
     <canvas id="chartCanvas" width="220" height="220"></canvas>
     <div class="chart-center">
       <div class="chart-center-label">Portfolio</div>
-      <div class="chart-center-val" id="hv">$0.00</div>
-      <div class="chart-center-aed" id="ha">د.إ 0.00</div>
+      <div class="chart-center-val" id="hv">د.إ 0.00</div>
+      <div class="chart-center-aed" id="ha">$0.00</div>
     </div>
   </div>
 </div>
@@ -308,16 +310,16 @@ input:focus{border-color:rgba(212,168,71,.5)}
 <div class="stats-strip">
   <div class="stat-item">
     <div class="stat-lbl">Invested</div>
-    <div class="stat-val" id="hi">$0.00</div>
+    <div class="stat-val" id="hi">د.إ 0.00</div>
   </div>
   <div class="stat-item" style="border-left:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06)">
     <div class="stat-lbl">P&L</div>
-    <div class="stat-val pos" id="hp">+$0.00</div>
+    <div class="stat-val pos" id="hp">+د.إ 0.00</div>
     <div class="stat-sub pos" id="hpc">+0.00%</div>
   </div>
   <div class="stat-item">
-    <div class="stat-lbl">P&L (AED)</div>
-    <div class="stat-val pos" id="hpa">+د.إ 0.00</div>
+    <div class="stat-lbl">P&L (USD)</div>
+    <div class="stat-val pos" id="hpa">+$0.00</div>
   </div>
 </div>
 
@@ -504,17 +506,17 @@ function render(){
     const mV=mh.reduce((s,h)=>s+calc(h).cU,0);
     const mI=mh.reduce((s,h)=>s+calc(h).iU,0);
     const mPL=mV-mI, mPos=mPL>=0, mPLP=mI>0?(mPL/mI)*100:0;
-    document.getElementById('hv').textContent=fU(mV);
-    document.getElementById('ha').textContent=fA(mV*AR);
-    document.getElementById('hi').textContent=fU(mI);
+    document.getElementById('hv').textContent=fA(mV*AR);
+    document.getElementById('ha').textContent=fU(mV);
+    document.getElementById('hi').textContent=fA(mI*AR);
     const hp=document.getElementById('hp');
-    hp.textContent=(mPos?'▲ ':'▼ ')+fU(Math.abs(mPL));
+    hp.textContent=(mPos?'▲ ':'▼ ')+fA(Math.abs(mPL*AR));
     hp.className='stat-val '+(mPos?'pos':'neg');
     const hpc=document.getElementById('hpc');
     hpc.textContent=fP(mPLP);
     hpc.className='stat-sub '+(mPos?'pos':'neg');
     const hpa=document.getElementById('hpa');
-    hpa.textContent=(mPos?'▲ ':'▼ ')+fA(Math.abs(mPL*AR));
+    hpa.textContent=(mPos?'▲ ':'▼ ')+fU(Math.abs(mPL));
     hpa.className='stat-val '+(mPos?'pos':'neg');
   } else {
     upHdr();
@@ -620,7 +622,7 @@ function rHold(){
     const{cur,inv,cU,iU,plU,plA,plP,tPct,toT}=calc(h),pos=plP>=0,sym=SYM[h.currency],ep=epId===h.id;
     const bc=tPct>=100?'#5DBF7F':tPct>=60?'#D4A847':'#5B8FD4';
     const ts=h.targetPrice?'<div class="twrap"><div style="display:flex;justify-content:space-between"><span style="color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase">Target</span><span style="font-size:11px;color:'+bc+'">'+(toT!==null?(toT>=0?'+'+toT.toFixed(1)+'% to go':'🎯 Reached!'):'—')+'</span></div><div class="tbg"><div class="tfill" style="width:'+(tPct||0)+'%;background:'+bc+'"></div></div><div style="display:flex;justify-content:space-between;margin-top:3px"><span style="color:var(--dim);font-size:10px">Buy: '+sym+h.buyPrice+'</span><span style="color:var(--dim);font-size:10px">Now: '+sym+h.currentPrice+'</span><span style="color:'+bc+';font-size:10px">Target: '+sym+h.targetPrice+'</span></div></div>':'';
-    return '<div class="card"><div class="card-top"><div style="display:flex;align-items:center"><div class="mbadge" style="border-color:'+CLR[h.market]+';color:'+CLR[h.market]+'">'+FLG[h.market]+' '+h.market+'</div>'+(h.livePrice?'<span class="lbadge">● LIVE</span>':'')+'</div><div class="acts"><button class="ibtn" data-action="edit" data-id="'+h.id+'">✏️</button><button class="ibtn" data-action="del" data-id="'+h.id+'">🗑️</button></div></div><div class="cmid"><div><div class="hn">'+h.name+'</div><div class="hsb">'+h.symbol+' · '+h.shares+' units</div></div><div><div class="hv">'+fU(cU)+'</div><div class="ha">'+fA(cU*AR)+'</div></div></div><div class="plbox" style="border-left:3px solid '+(pos?'#5DBF7F':'#E05555')+'"><div><div style="color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">Profit / Loss</div><div class="plm '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+fU(Math.abs(plU))+'</div><div class="pla '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+fA(Math.abs(plA))+'</div></div><div style="text-align:right"><div class="plp '+(pos?'pos':'neg')+'">'+fP(plP)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">return</div></div></div><div class="irow"><div class="ibox"><div class="ilbl">Invested</div><div class="ival">'+fN(inv,h.currency)+'</div><div class="isub">'+fU(iU)+' · '+sym+h.buyPrice+'/unit</div></div><div class="ibox"><div class="ilbl">Value</div><div class="ival">'+fN(cur,h.currency)+'</div><div class="isub">'+fU(cU)+' · '+sym+h.currentPrice+'/unit</div></div></div>'+ts+'<div class="sgrid"><div class="sbox"><div class="slbl">Units</div><div class="sval">'+h.shares+'</div></div><div class="sbox"><div class="slbl">Buy</div><div class="sval">'+sym+h.buyPrice+'</div></div><div class="sbox"><div class="slbl">Target</div><div class="sval" style="color:'+(h.targetPrice?'#D4A847':'var(--dim)')+'">'+( h.targetPrice?sym+h.targetPrice:'—')+'</div></div></div><div style="display:flex;align-items:center;gap:7px" id="pr-'+h.id+'">'+(ep?'<input class="pinput" id="pi-'+h.id+'" type="number" value="'+h.currentPrice+'" inputmode="decimal"/><button class="pok" data-action="confp" data-id="'+h.id+'">✓</button><button class="pcan" data-action="cancp">✕</button>':'<button class="upbtn" data-action="editp" data-id="'+h.id+'">🔄 Update Price ('+sym+h.currentPrice+')</button>')+'</div></div>';
+    return '<div class="card"><div class="card-top"><div style="display:flex;align-items:center"><div class="mbadge" style="border-color:'+CLR[h.market]+';color:'+CLR[h.market]+'">'+FLG[h.market]+' '+h.market+'</div>'+(h.livePrice?'<span class="lbadge">● LIVE</span>':'')+'</div><div class="acts"><button class="ibtn" data-action="edit" data-id="'+h.id+'">✏️</button><button class="ibtn" data-action="del" data-id="'+h.id+'">🗑️</button></div></div><div class="cmid"><div><div class="hn">'+h.name+'</div><div class="hsb">'+h.symbol+' · '+h.shares+' units</div></div><div>'+(h.currency==='AED'?'<div class="hv">'+fA(cU*AR)+'</div><div class="ha">'+fU(cU)+'</div>':h.currency==='INR'?'<div class="hv">'+fR(calc(h).cur)+'</div><div class="ha">'+fU(cU)+'</div>':'<div class="hv">'+fU(cU)+'</div><div class="ha">'+fA(cU*AR)+'</div>')+'</div></div><div class="plbox" style="border-left:3px solid '+(pos?'#5DBF7F':'#E05555')+'"><div><div style="color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">Profit / Loss</div><div class="plm '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+(h.currency==='INR'?fR(Math.abs(plU*(h.currency==='INR'?IR:1))):fA(Math.abs(plA)))+'</div><div class="pla '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+fU(Math.abs(plU))+'</div></div><div style="text-align:right"><div class="plp '+(pos?'pos':'neg')+'">'+fP(plP)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">return</div></div></div><div class="irow"><div class="ibox"><div class="ilbl">Invested</div><div class="ival">'+fN(inv,h.currency)+'</div><div class="isub">'+fU(iU)+' · '+sym+h.buyPrice+'/unit</div></div><div class="ibox"><div class="ilbl">Value</div><div class="ival">'+fN(cur,h.currency)+'</div><div class="isub">'+fU(cU)+' · '+sym+h.currentPrice+'/unit</div></div></div>'+ts+'<div class="sgrid"><div class="sbox"><div class="slbl">Units</div><div class="sval">'+h.shares+'</div></div><div class="sbox"><div class="slbl">Buy</div><div class="sval">'+sym+h.buyPrice+'</div></div><div class="sbox"><div class="slbl">Target</div><div class="sval" style="color:'+(h.targetPrice?'#D4A847':'var(--dim)')+'">'+( h.targetPrice?sym+h.targetPrice:'—')+'</div></div></div><div style="display:flex;align-items:center;gap:7px" id="pr-'+h.id+'">'+(ep?'<input class="pinput" id="pi-'+h.id+'" type="number" value="'+h.currentPrice+'" inputmode="decimal"/><button class="pok" data-action="confp" data-id="'+h.id+'">✓</button><button class="pcan" data-action="cancp">✕</button>':'<button class="upbtn" data-action="editp" data-id="'+h.id+'">🔄 Update Price ('+sym+h.currentPrice+')</button>')+'</div></div>';
   }).join('');
 }
 
@@ -631,8 +633,8 @@ function rMkt(){
     const mh=H.filter(h=>h.market===mk);if(!mh.length)return;
     const mV=mh.reduce((s,h)=>s+calc(h).cU,0),mI=mh.reduce((s,h)=>s+calc(h).iU,0),mPL=mV-mI,mPos=mPL>=0,mPP=mI>0?(mPL/mI)*100:0;
     html+='<div style="margin-bottom:14px"><div style="color:'+CLR[mk]+';font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;font-weight:500">'+FLG[mk]+' '+mk+'</div>';
-    html+='<div class="msumm"><div><div style="font-family:\'Playfair Display\',serif;font-size:19px;font-weight:700;color:var(--text)">'+fU(mV)+'</div><div style="color:var(--dim);font-size:11px;margin-top:2px">'+fA(mV*AR)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">Invested: '+fU(mI)+'</div></div><div style="text-align:right"><div style="font-size:14px;font-weight:700" class="'+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fU(Math.abs(mPL))+'</div><div style="font-size:12px;margin-top:2px" class="'+(mPos?'pos':'neg')+'">'+fP(mPP)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">'+(t.cU>0?((mV/t.cU)*100).toFixed(1)+'%':'0%')+' of total</div></div></div>';
-    html+=mh.map(function(h){const{cU,plP}=calc(h),sym=SYM[h.currency];return'<div class="mrow"><div><div style="color:var(--text);font-size:13px;font-weight:500">'+h.name+(h.livePrice?' <span style="color:#5DBF7F;font-size:9px">●</span>':'')+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">'+h.symbol+' · '+h.shares+' units · Buy: '+sym+h.buyPrice+(h.targetPrice?' · 🎯'+sym+h.targetPrice:'')+'</div></div><div style="text-align:right"><div style="color:var(--text);font-size:13px">'+fU(cU)+'</div><div style="font-size:11px" class="'+(plP>=0?'pos':'neg')+'">'+fP(plP)+'</div></div></div>';}).join('');
+    html+='<div class="msumm"><div><div style="font-family:\'Playfair Display\',serif;font-size:19px;font-weight:700;color:var(--text)">'+fU(mV)+'</div><div style="color:var(--dim);font-size:11px;margin-top:2px">'+fA(mV*AR)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">Invested: '+fU(mI)+'</div></div><div style="text-align:right"><div style="font-size:14px;font-weight:700" class="'+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fA(Math.abs(mPL*AR))+'</div><div style="font-size:12px;margin-top:2px" class="'+(mPos?'pos':'neg')+'">'+fP(mPP)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">'+(t.cU>0?((mV/t.cU)*100).toFixed(1)+'%':'0%')+' of total</div></div></div>';
+    html+=mh.map(function(h){const{cU,plP}=calc(h),sym=SYM[h.currency];return'<div class="mrow"><div><div style="color:var(--text);font-size:13px;font-weight:500">'+h.name+(h.livePrice?' <span style="color:#5DBF7F;font-size:9px">●</span>':'')+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">'+h.symbol+' · '+h.shares+' units · Buy: '+sym+h.buyPrice+(h.targetPrice?' · 🎯'+sym+h.targetPrice:'')+'</div></div><div style="text-align:right"><div style="color:var(--text);font-size:13px">'+fN(calc(h).cur,h.currency)+'</div><div style="font-size:11px" class="'+(plP>=0?'pos':'neg')+'">'+fP(plP)+'</div></div></div>';}).join('');
     html+='</div>';
   });
   return html||'<div class="empty" style="padding-top:40px"><div class="ei">📭</div><div class="et">No holdings yet</div></div>';

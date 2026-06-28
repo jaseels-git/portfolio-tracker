@@ -506,11 +506,14 @@ function render(){
     const mV=mh.reduce((s,h)=>s+calc(h).cU,0);
     const mI=mh.reduce((s,h)=>s+calc(h).iU,0);
     const mPL=mV-mI, mPos=mPL>=0, mPLP=mI>0?(mPL/mI)*100:0;
-    document.getElementById('hv').textContent=fA(mV*AR);
+    const nativeV=dTab==='NSE'||dTab==='BSE'?fR(mh.reduce(function(s,h){return s+h.currentPrice*h.shares;},0)):dTab==='DFM'||dTab==='ADX'?fA(mV*AR):fU(mV);
+    const nativeI=dTab==='NSE'||dTab==='BSE'?fR(mh.reduce(function(s,h){return s+h.buyPrice*h.shares;},0)):dTab==='DFM'||dTab==='ADX'?fA(mI*AR):fU(mI);
+    const nativePL=dTab==='NSE'||dTab==='BSE'?fR(Math.abs(mPL*IR)):dTab==='DFM'||dTab==='ADX'?fA(Math.abs(mPL*AR)):fU(Math.abs(mPL));
+    document.getElementById('hv').textContent=nativeV;
     document.getElementById('ha').textContent=fU(mV);
-    document.getElementById('hi').textContent=fA(mI*AR);
+    document.getElementById('hi').textContent=nativeI;
     const hp=document.getElementById('hp');
-    hp.textContent=(mPos?'▲ ':'▼ ')+fA(Math.abs(mPL*AR));
+    hp.textContent=(mPos?'▲ ':'▼ ')+nativePL;
     hp.className='stat-val '+(mPos?'pos':'neg');
     const hpc=document.getElementById('hpc');
     hpc.textContent=fP(mPLP);
@@ -568,7 +571,7 @@ function rDash(){
     const mPL=mV-mI, mPos=mPL>=0, isAct=dTab===m;
     tabs+='<div class="mkt-tab'+(isAct?' on':'')+'" onclick="setDT(\''+m+'\')" '+(isAct?'style="border-color:rgba(212,168,71,.5);background:rgba(212,168,71,.08)"':'')+'>'+
       '<div class="mkt-tab-top"><span class="mkt-tab-flag">'+FLG[m]+'</span><span class="mkt-tab-name">'+m+'</span></div>'+
-      '<div class="mkt-tab-val">'+fU(mV)+'</div>'+
+      '<div class="mkt-tab-val">'+(m==='NSE'||m==='BSE'?fR(H.filter(function(h){return h.market===m;}).reduce(function(s,h){return s+h.currentPrice*h.shares;},0)):m==='DFM'||m==='ADX'?fA(mV*AR):fU(mV))+'</div>'+
       '<div class="mkt-tab-pl '+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fP(mI>0?(mPL/mI)*100:0)+'</div>'+
     '</div>';
   });
@@ -587,12 +590,12 @@ function rDash(){
       const mPL=mV-mI, mPos=mPL>=0, mPLP=mI>0?(mPL/mI)*100:0;
       rows+='<div class="mkt-total">'+
         '<div class="mkt-total-left"><div class="mkt-total-label">'+FLG[dTab]+' '+dTab+' Total</div>'+
-        '<div class="mkt-total-val">'+fU(mV)+'</div>'+
-        '<div class="mkt-total-sub">'+fA(mV*AR)+'</div></div>'+
+        '<div class="mkt-total-val">'+(dTab==='NSE'||dTab==='BSE'?fR(showH.reduce(function(s,h){return s+h.currentPrice*h.shares;},0)):dTab==='DFM'||dTab==='ADX'?fA(mV*AR):fU(mV))+'</div>'+
+        '<div class="mkt-total-sub">'+fU(mV)+'</div></div>'+
         '<div class="mkt-total-pl">'+
-        '<div class="mkt-total-pl-val '+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fU(Math.abs(mPL))+'</div>'+
+        '<div class="mkt-total-pl-val '+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+(dTab==='NSE'||dTab==='BSE'?fR(Math.abs(mPL*IR)):dTab==='DFM'||dTab==='ADX'?fA(Math.abs(mPL*AR)):fU(Math.abs(mPL)))+'</div>'+
         '<div class="mkt-total-pl-pct '+(mPos?'pos':'neg')+'">'+fP(mPLP)+'</div>'+
-        '<div class="mkt-total-invested">Invested: '+fU(mI)+'</div>'+
+        '<div class="mkt-total-invested">Invested: '+(dTab==='NSE'||dTab==='BSE'?fR(showH.reduce(function(s,h){return s+h.buyPrice*h.shares;},0)):dTab==='DFM'||dTab==='ADX'?fA(mI*AR):fU(mI))+'</div>'+
         '</div></div>';
     }
     rows+=showH.map(function(h){
@@ -603,9 +606,9 @@ function rDash(){
         '<div class="dsi" style="background:'+CLR[h.market]+'22;color:'+CLR[h.market]+'">'+init+'</div>'+
         '<div><div class="dsname">'+h.name+(h.livePrice?' <span style="color:#5DBF7F;font-size:9px">●</span>':'')+'</div>'+
         '<div class="dssub">'+h.symbol+' · '+h.shares+' units · '+sym+h.currentPrice+'</div></div></div>'+
-        '<div><div class="dsval">'+fU(cU)+'</div>'+
-        '<div class="dspl '+(p2?'pos':'neg')+'">'+(p2?'▲':'▼')+' '+fU(Math.abs(plU))+' · '+fP(plP)+'</div>'+
-        '<div class="dsaed">'+fA(cU*AR)+'</div></div></div>';
+        '<div><div class="dsval">'+(h.currency==='AED'?fA(cU*AR):h.currency==='INR'?fR(h.currentPrice*h.shares):fU(cU))+'</div>'+
+        '<div class="dspl '+(p2?'pos':'neg')+'">'+(p2?'▲':'▼')+' '+(h.currency==='AED'?fA(Math.abs(plU*AR)):h.currency==='INR'?fR(Math.abs(plU*IR)):fU(Math.abs(plU)))+' · '+fP(plP)+'</div>'+
+        '<div class="dsaed">'+fU(cU)+'</div></div></div>';
     }).join('');
   } else {
     rows='<div class="empty"><div class="ei">📭</div><div class="et">No '+dTab+' holdings yet</div></div>';
@@ -622,7 +625,7 @@ function rHold(){
     const{cur,inv,cU,iU,plU,plA,plP,tPct,toT}=calc(h),pos=plP>=0,sym=SYM[h.currency],ep=epId===h.id;
     const bc=tPct>=100?'#5DBF7F':tPct>=60?'#D4A847':'#5B8FD4';
     const ts=h.targetPrice?'<div class="twrap"><div style="display:flex;justify-content:space-between"><span style="color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase">Target</span><span style="font-size:11px;color:'+bc+'">'+(toT!==null?(toT>=0?'+'+toT.toFixed(1)+'% to go':'🎯 Reached!'):'—')+'</span></div><div class="tbg"><div class="tfill" style="width:'+(tPct||0)+'%;background:'+bc+'"></div></div><div style="display:flex;justify-content:space-between;margin-top:3px"><span style="color:var(--dim);font-size:10px">Buy: '+sym+h.buyPrice+'</span><span style="color:var(--dim);font-size:10px">Now: '+sym+h.currentPrice+'</span><span style="color:'+bc+';font-size:10px">Target: '+sym+h.targetPrice+'</span></div></div>':'';
-    return '<div class="card"><div class="card-top"><div style="display:flex;align-items:center"><div class="mbadge" style="border-color:'+CLR[h.market]+';color:'+CLR[h.market]+'">'+FLG[h.market]+' '+h.market+'</div>'+(h.livePrice?'<span class="lbadge">● LIVE</span>':'')+'</div><div class="acts"><button class="ibtn" data-action="edit" data-id="'+h.id+'">✏️</button><button class="ibtn" data-action="del" data-id="'+h.id+'">🗑️</button></div></div><div class="cmid"><div><div class="hn">'+h.name+'</div><div class="hsb">'+h.symbol+' · '+h.shares+' units</div></div><div>'+(h.currency==='AED'?'<div class="hv">'+fA(cU*AR)+'</div><div class="ha">'+fU(cU)+'</div>':h.currency==='INR'?'<div class="hv">'+fR(calc(h).cur)+'</div><div class="ha">'+fU(cU)+'</div>':'<div class="hv">'+fU(cU)+'</div><div class="ha">'+fA(cU*AR)+'</div>')+'</div></div><div class="plbox" style="border-left:3px solid '+(pos?'#5DBF7F':'#E05555')+'"><div><div style="color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">Profit / Loss</div><div class="plm '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+(h.currency==='INR'?fR(Math.abs(plU*IR)):h.currency==='AED'?fA(Math.abs(plA)):fU(Math.abs(plU)))+'</div><div class="pla '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+fU(Math.abs(plU))+'</div></div><div style="text-align:right"><div class="plp '+(pos?'pos':'neg')+'">'+fP(plP)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">return</div></div></div><div class="irow"><div class="ibox"><div class="ilbl">Invested</div><div class="ival">'+fN(inv,h.currency)+'</div><div class="isub">'+fU(iU)+' · '+sym+h.buyPrice+'/unit</div></div><div class="ibox"><div class="ilbl">Value</div><div class="ival">'+fN(cur,h.currency)+'</div><div class="isub">'+fU(cU)+' · '+sym+h.currentPrice+'/unit</div></div></div>'+ts+'<div class="sgrid"><div class="sbox"><div class="slbl">Units</div><div class="sval">'+h.shares+'</div></div><div class="sbox"><div class="slbl">Buy</div><div class="sval">'+sym+h.buyPrice+'</div></div><div class="sbox"><div class="slbl">Target</div><div class="sval" style="color:'+(h.targetPrice?'#D4A847':'var(--dim)')+'">'+( h.targetPrice?sym+h.targetPrice:'—')+'</div></div></div><div style="display:flex;align-items:center;gap:7px" id="pr-'+h.id+'">'+(ep?'<input class="pinput" id="pi-'+h.id+'" type="number" value="'+h.currentPrice+'" inputmode="decimal"/><button class="pok" data-action="confp" data-id="'+h.id+'">✓</button><button class="pcan" data-action="cancp">✕</button>':'<button class="upbtn" data-action="editp" data-id="'+h.id+'">🔄 Update Price ('+sym+h.currentPrice+')</button>')+'</div></div>';
+    return '<div class="card"><div class="card-top"><div style="display:flex;align-items:center"><div class="mbadge" style="border-color:'+CLR[h.market]+';color:'+CLR[h.market]+'">'+FLG[h.market]+' '+h.market+'</div>'+(h.livePrice?'<span class="lbadge">● LIVE</span>':'')+'</div><div class="acts"><button class="ibtn" data-action="edit" data-id="'+h.id+'">✏️</button><button class="ibtn" data-action="del" data-id="'+h.id+'">🗑️</button></div></div><div class="cmid"><div><div class="hn">'+h.name+'</div><div class="hsb">'+h.symbol+' · '+h.shares+' units</div></div><div>'+(h.currency==='AED'?'<div class="hv">'+fA(cU*AR)+'</div><div class="ha">'+fU(cU)+'</div>':h.currency==='INR'?'<div class="hv">'+fR(h.currentPrice*h.shares)+'</div><div class="ha">'+fU(cU)+'</div>':'<div class="hv">'+fU(cU)+'</div><div class="ha">'+fA(cU*AR)+'</div>')+'</div></div><div class="plbox" style="border-left:3px solid '+(pos?'#5DBF7F':'#E05555')+'"><div><div style="color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">Profit / Loss</div><div class="plm '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+(h.currency==='INR'?fR(Math.abs((h.currentPrice-h.buyPrice)*h.shares)):h.currency==='AED'?fA(Math.abs(plA)):fU(Math.abs(plU)))+'</div><div class="pla '+(pos?'pos':'neg')+'">'+(pos?'▲':'▼')+' '+fU(Math.abs(plU))+'</div></div><div style="text-align:right"><div class="plp '+(pos?'pos':'neg')+'">'+fP(plP)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">return</div></div></div><div class="irow"><div class="ibox"><div class="ilbl">Invested</div><div class="ival">'+fN(inv,h.currency)+'</div><div class="isub">'+fU(iU)+' · '+sym+h.buyPrice+'/unit</div></div><div class="ibox"><div class="ilbl">Value</div><div class="ival">'+fN(cur,h.currency)+'</div><div class="isub">'+fU(cU)+' · '+sym+h.currentPrice+'/unit</div></div></div>'+ts+'<div class="sgrid"><div class="sbox"><div class="slbl">Units</div><div class="sval">'+h.shares+'</div></div><div class="sbox"><div class="slbl">Buy</div><div class="sval">'+sym+h.buyPrice+'</div></div><div class="sbox"><div class="slbl">Target</div><div class="sval" style="color:'+(h.targetPrice?'#D4A847':'var(--dim)')+'">'+( h.targetPrice?sym+h.targetPrice:'—')+'</div></div></div><div style="display:flex;align-items:center;gap:7px" id="pr-'+h.id+'">'+(ep?'<input class="pinput" id="pi-'+h.id+'" type="number" value="'+h.currentPrice+'" inputmode="decimal"/><button class="pok" data-action="confp" data-id="'+h.id+'">✓</button><button class="pcan" data-action="cancp">✕</button>':'<button class="upbtn" data-action="editp" data-id="'+h.id+'">🔄 Update Price ('+sym+h.currentPrice+')</button>')+'</div></div>';
   }).join('');
 }
 
@@ -634,7 +637,7 @@ function rMkt(){
     const mV=mh.reduce((s,h)=>s+calc(h).cU,0),mI=mh.reduce((s,h)=>s+calc(h).iU,0),mPL=mV-mI,mPos=mPL>=0,mPP=mI>0?(mPL/mI)*100:0;
     html+='<div style="margin-bottom:14px"><div style="color:'+CLR[mk]+';font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;font-weight:500">'+FLG[mk]+' '+mk+'</div>';
     html+='<div class="msumm"><div><div style="font-family:\'Playfair Display\',serif;font-size:19px;font-weight:700;color:var(--text)">'+fU(mV)+'</div><div style="color:var(--dim);font-size:11px;margin-top:2px">'+fA(mV*AR)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">Invested: '+fU(mI)+'</div></div><div style="text-align:right"><div style="font-size:14px;font-weight:700" class="'+(mPos?'pos':'neg')+'">'+(mPos?'▲':'▼')+' '+fA(Math.abs(mPL*AR))+'</div><div style="font-size:12px;margin-top:2px" class="'+(mPos?'pos':'neg')+'">'+fP(mPP)+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">'+(t.cU>0?((mV/t.cU)*100).toFixed(1)+'%':'0%')+' of total</div></div></div>';
-    html+=mh.map(function(h){const{cU,plP}=calc(h),sym=SYM[h.currency];return'<div class="mrow"><div><div style="color:var(--text);font-size:13px;font-weight:500">'+h.name+(h.livePrice?' <span style="color:#5DBF7F;font-size:9px">●</span>':'')+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">'+h.symbol+' · '+h.shares+' units · Buy: '+sym+h.buyPrice+(h.targetPrice?' · 🎯'+sym+h.targetPrice:'')+'</div></div><div style="text-align:right"><div style="color:var(--text);font-size:13px">'+(h.currency==='AED'?fA(cU*AR):h.currency==='INR'?fR(calc(h).cur):fU(cU))+'</div><div style="font-size:11px" class="'+(plP>=0?'pos':'neg')+'">'+fP(plP)+'</div></div></div>';}).join('');
+    html+=mh.map(function(h){const{cU,plP}=calc(h),sym=SYM[h.currency];return'<div class="mrow"><div><div style="color:var(--text);font-size:13px;font-weight:500">'+h.name+(h.livePrice?' <span style="color:#5DBF7F;font-size:9px">●</span>':'')+'</div><div style="color:var(--dim);font-size:10px;margin-top:2px">'+h.symbol+' · '+h.shares+' units · Buy: '+sym+h.buyPrice+(h.targetPrice?' · 🎯'+sym+h.targetPrice:'')+'</div></div><div style="text-align:right"><div style="color:var(--text);font-size:13px">'+(h.currency==='AED'?fA(cU*AR):h.currency==='INR'?fR(h.currentPrice*h.shares):fU(cU))+'</div><div style="font-size:11px" class="'+(plP>=0?'pos':'neg')+'">'+fP(plP)+'</div></div></div>';}).join('');
     html+='</div>';
   });
   return html||'<div class="empty" style="padding-top:40px"><div class="ei">📭</div><div class="et">No holdings yet</div></div>';

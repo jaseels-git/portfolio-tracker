@@ -261,6 +261,22 @@ module.exports = async function handler(req, res) {
         }))});
       }
 
+      if (market==='Metals') {
+        const metals = [
+          {symbol:'XAU',name:'Gold (Troy Oz)'},
+          {symbol:'XAG',name:'Silver (Troy Oz)'},
+          {symbol:'XPT',name:'Platinum (Troy Oz)'},
+          {symbol:'XPD',name:'Palladium (Troy Oz)'},
+          {symbol:'GOLD-GRAM',name:'Gold (per Gram)'},
+          {symbol:'SILVER-GRAM',name:'Silver (per Gram)'},
+          {symbol:'GOLD-10G',name:'Gold (per 10 Grams)'},
+          {symbol:'GOLD-TOLA',name:'Gold (per Tola - 11.66g)'},
+        ];
+        const q2 = query.toLowerCase();
+        const results = metals.filter(m=>m.name.toLowerCase().includes(q2)||m.symbol.toLowerCase().includes(q2));
+        return res.json({results: results.map(m=>({symbol:m.symbol,name:m.name,exchange:'Metals',type:'metal'}))});
+      }
+
       // International search via AV
       try {
         const r = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(query)}&apikey=${AV_KEY}`);
@@ -281,6 +297,58 @@ module.exports = async function handler(req, res) {
       const cryptos = list.filter(s=>s.startsWith('crypto:'));
       const stocks = list.filter(s=>!s.startsWith('crypto:'));
 
+      // Metals via open metals API
+      const metalsList = stocks.filter(s=>['XAU','XAG','XPT','XPD','GOLD-GRAM','SILVER-GRAM','GOLD-10G','GOLD-TOLA'].includes(s));
+      const nonMetalStocks = stocks.filter(s=>!['XAU','XAG','XPT','XPD','GOLD-GRAM','SILVER-GRAM','GOLD-10G','GOLD-TOLA'].includes(s));
+
+      if (metalsList.length>0) {
+        try {
+          // Use metals-api.com free tier or frankfurter for XAU/XAG
+          const r = await fetch('https://api.metals.live/v1/spot');
+          const d = await r.json();
+          // d is array of {gold: price, silver: price, ...}
+          const metalData = Array.isArray(d) ? d[0] : d;
+          const goldUSD = metalData.gold || metalData.XAU;
+          const silverUSD = metalData.silver || metalData.XAG;
+          const platinumUSD = metalData.platinum || metalData.XPT;
+          const palladiumUSD = metalData.palladium || metalData.XPD;
+
+          for (const sym of metalsList) {
+            let price = null;
+            if (sym==='XAU') price = goldUSD;
+            else if (sym==='XAG') price = silverUSD;
+            else if (sym==='XPT') price = platinumUSD;
+            else if (sym==='XPD') price = palladiumUSD;
+            else if (sym==='GOLD-GRAM') price = goldUSD ? goldUSD/31.1035 : null;
+            else if (sym==='SILVER-GRAM') price = silverUSD ? silverUSD/31.1035 : null;
+            else if (sym==='GOLD-10G') price = goldUSD ? (goldUSD/31.1035)*10 : null;
+            else if (sym==='GOLD-TOLA') price = goldUSD ? (goldUSD/31.1035)*11.6638 : null;
+
+            if (price) {
+              prices[sym] = {price: Math.round(price*100)/100, change24h:0, currency:'USD'};
+              console.log('Metal price:', sym, price);
+            }
+          }
+        } catch(e) {
+          // Fallback: try frankfurter API for gold
+          try {
+            const r = await fetch('https://api.frankfurter.app/latest?from=XAU&to=USD');
+            const d = await r.json();
+            if (d.rates && d.rates.USD) {
+              const goldUSD = 1/d.rates.USD;
+              for (const sym of metalsList) {
+                let price = null;
+                if (sym==='XAU') price = goldUSD;
+                else if (sym==='GOLD-GRAM') price = goldUSD/31.1035;
+                else if (sym==='GOLD-10G') price = (goldUSD/31.1035)*10;
+                else if (sym==='GOLD-TOLA') price = (goldUSD/31.1035)*11.6638;
+                if (price) prices[sym] = {price: Math.round(price*100)/100, change24h:0, currency:'USD'};
+              }
+            }
+          } catch(e2) { console.log('Metals fallback failed'); }
+        }
+      }
+
       // Crypto via CoinGecko (free, reliable)
       if (cryptos.length>0) {
         try {
@@ -294,9 +362,10 @@ module.exports = async function handler(req, res) {
       }
 
       // UAE stocks in parallel (no rate limit on Yahoo)
-      const uae = stocks.filter(s=>s.endsWith('.DU')||s.endsWith('.AD'));
-      const india = stocks.filter(s=>s.endsWith('.NS')||s.endsWith('.BO'));
-      const intl = stocks.filter(s=>!s.endsWith('.DU')&&!s.endsWith('.AD')&&!s.endsWith('.NS')&&!s.endsWith('.BO'));
+      const stocks2 = nonMetalStocks || stocks;
+      const uae = stocks2.filter(s=>s.endsWith('.DU')||s.endsWith('.AD'));
+      const india = stocks2.filter(s=>s.endsWith('.NS')||s.endsWith('.BO'));
+      const intl = stocks2.filter(s=>!s.endsWith('.DU')&&!s.endsWith('.AD')&&!s.endsWith('.NS')&&!s.endsWith('.BO'));
 
       // UAE parallel
       if (uae.length>0) {

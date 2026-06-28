@@ -350,6 +350,7 @@ input:focus{border-color:rgba(212,168,71,.5)}
     <button class="pill" onclick="sm('BSE')">🇮🇳 BSE</button>
     <button class="pill" onclick="sm('International')">🌐 Intl</button>
     <button class="pill" onclick="sm('Crypto')">₿ Crypto</button>
+    <button class="pill" onclick="sm('Metals')">🥇 Metals</button>
   </div>
   <span class="slbl2">2 · Search Asset</span>
   <div class="srchwrap">
@@ -385,9 +386,9 @@ input:focus{border-color:rgba(212,168,71,.5)}
 <script>
 // ── Config ──
 const AR=3.6725,IR=83.5;
-const MKTS=['DFM','ADX','NSE','BSE','International','Crypto'];
-const CLR={DFM:'#D4A847',ADX:'#5DBF7F',NSE:'#E8834C',BSE:'#E84C7A',International:'#5B8FD4',Crypto:'#A06CD5'};
-const FLG={DFM:'🇦🇪',ADX:'🇦🇪',NSE:'🇮🇳',BSE:'🇮🇳',International:'🌐',Crypto:'₿'};
+const MKTS=['DFM','ADX','NSE','BSE','International','Crypto','Metals'];
+const CLR={DFM:'#D4A847',ADX:'#5DBF7F',NSE:'#E8834C',BSE:'#E84C7A',International:'#5B8FD4',Crypto:'#A06CD5',Metals:'#C0C0C0'};
+const FLG={DFM:'🇦🇪',ADX:'🇦🇪',NSE:'🇮🇳',BSE:'🇮🇳',International:'🌐',Crypto:'₿',Metals:'🥇'};
 const SYM={AED:'د.إ',USD:'$',INR:'₹'};
 const KEY='pf-v7';
 const API='/api/prices';
@@ -705,7 +706,7 @@ function sm(m){
       p.classList.add('on');p.style.background=CLR[m];p.style.color='#1A1410';
     }
   });
-  const ph={DFM:'Search UAE stocks...',ADX:'Search ADX stocks...',NSE:'Search NSE stocks...',BSE:'Search BSE stocks...',International:'Search global stocks...',Crypto:'Search crypto...'};
+  const ph={DFM:'Search UAE stocks...',ADX:'Search ADX stocks...',NSE:'Search NSE stocks...',BSE:'Search BSE stocks...',International:'Search global stocks...',Crypto:'Search crypto...',Metals:'Search metals (gold, silver...)'};
   document.getElementById('si').placeholder=ph[m]||'Search...';
   document.getElementById('si').value='';
   document.getElementById('sr').innerHTML='';
@@ -775,7 +776,7 @@ function selStk(sym,name){
   document.getElementById('ss').innerHTML='<div class="selstock"><div><div style="color:var(--text);font-size:13px;font-weight:600">'+name+'</div><div style="color:var(--gold);font-size:11px;margin-top:2px">'+sym+' · '+fMkt+'</div></div><button onclick="clrStk()" style="background:rgba(255,255,255,.06);border:none;border-radius:7px;padding:4px 9px;color:var(--muted);cursor:pointer;font-size:12px;-webkit-appearance:none">Change</button></div>';
   document.getElementById('s3').style.display='block';
   document.getElementById('ff').style.display='block';
-  const ac={DFM:'AED',ADX:'AED',NSE:'INR',BSE:'INR',International:'USD',Crypto:'USD'};
+  const ac={DFM:'AED',ADX:'AED',NSE:'INR',BSE:'INR',International:'USD',Crypto:'USD',Metals:'USD'};
   sc(ac[fMkt]||'USD');
 }
 function clrStk(){
